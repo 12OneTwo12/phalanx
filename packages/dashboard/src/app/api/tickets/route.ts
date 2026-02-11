@@ -5,14 +5,18 @@ import type { NewTicket } from '@phalanx/core';
 
 /** GET /api/tickets — list tickets with optional filters */
 export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
-  const status = searchParams.get('status') as NewTicket['status'] | null;
-  const epicId = searchParams.get('epicId');
-  const repo = getTicketRepository();
+  try {
+    const { searchParams } = request.nextUrl;
+    const status = searchParams.get('status') as NewTicket['status'] | null;
+    const epicId = searchParams.get('epicId');
+    const repo = getTicketRepository();
 
-  if (status) return jsonResponse(repo.findByStatus(status));
-  if (epicId) return jsonResponse(repo.findByEpicId(epicId));
-  return jsonResponse(repo.findAll());
+    if (status) return jsonResponse(repo.findByStatus(status));
+    if (epicId) return jsonResponse(repo.findByEpicId(epicId));
+    return jsonResponse(repo.findAll());
+  } catch {
+    return errorResponse('Failed to fetch tickets', 500);
+  }
 }
 
 /** POST /api/tickets — create a new ticket */

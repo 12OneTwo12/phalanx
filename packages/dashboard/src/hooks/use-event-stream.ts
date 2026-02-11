@@ -38,6 +38,7 @@ export function useEventStream(options: UseEventStreamOptions = {}): UseEventStr
   const [connected, setConnected] = useState(false);
   const [lastEvent, setLastEvent] = useState<BusEvent | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
 
@@ -65,8 +66,9 @@ export function useEventStream(options: UseEventStreamOptions = {}): UseEventStr
     es.onerror = () => {
       setConnected(false);
       es.close();
-      // Auto-reconnect
-      setTimeout(() => {
+      // Auto-reconnect with cleanup tracking
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null;
         connect();
       }, reconnectDelay);
     };
@@ -76,6 +78,7 @@ export function useEventStream(options: UseEventStreamOptions = {}): UseEventStr
     connect();
     return () => {
       eventSourceRef.current?.close();
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       setConnected(false);
     };
   }, [connect]);
