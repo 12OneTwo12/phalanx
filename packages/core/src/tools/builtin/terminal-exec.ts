@@ -12,6 +12,20 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_OUTPUT_CHARS = 50_000;
 
+/** Dangerous command patterns that are always blocked */
+const BLOCKED_COMMAND_PATTERNS: RegExp[] = [
+  /\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+).*\//,  // rm -rf / variants
+  /\brm\s+-[a-zA-Z]*r[a-zA-Z]*\s+\/\s*$/,               // rm -r /
+  /\bmkfs\b/,                                              // format filesystem
+  /\bdd\s+.*of=\/dev\//,                                  // dd to device
+  />\s*\/dev\/sd[a-z]/,                                    // redirect to disk
+  /\b:()\s*\{\s*:\|\s*:&\s*\}\s*;?\s*:/,                  // fork bomb
+  /\bcurl\b.*\|\s*(ba)?sh/,                               // curl pipe to shell
+  /\bwget\b.*\|\s*(ba)?sh/,                               // wget pipe to shell
+  /\bchmod\s+(-[a-zA-Z]*\s+)?777\s+\//,                  // chmod 777 /
+  /\bchown\s+.*\s+\/\s*$/,                                // chown / root
+];
+
 // ---------------------------------------------------------------------------
 // Schema
 // ---------------------------------------------------------------------------
@@ -37,6 +51,17 @@ export const terminalExecTool: Tool<typeof schema> = {
     params: z.infer<z.ZodObject<typeof schema>>,
     context: ToolExecutionContext,
   ): Promise<ToolResult> {
+    // Check against blocked command patterns
+    for (const pattern of BLOCKED_COMMAND_PATTERNS) {
+      if (pattern.test(params.command)) {
+        return {
+          success: false,
+          content: '',
+          error: 'Command blocked: matches a dangerous command pattern',
+        };
+      }
+    }
+
     try {
       const timeoutMs = params.timeout ?? context.timeout ?? DEFAULT_TIMEOUT_MS;
 
