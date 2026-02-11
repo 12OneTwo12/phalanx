@@ -6,7 +6,7 @@ import type { AgentToolPermissions } from '../tools/types.js';
 // Agent Role
 // ---------------------------------------------------------------------------
 
-export const AgentRole = z.enum(['team-lead', 'backend', 'frontend', 'qa', 'customer']);
+export const AgentRole = z.enum(['team-lead', 'backend', 'frontend', 'qa', 'devops', 'customer']);
 export type AgentRole = z.infer<typeof AgentRole>;
 
 // ---------------------------------------------------------------------------
