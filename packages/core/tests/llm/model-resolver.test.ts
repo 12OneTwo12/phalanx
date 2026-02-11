@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { parseModelId, formatModelId } from '../../src/llm/model-id.js';
 import { ProviderRegistry } from '../../src/llm/provider-registry.js';
 import { ProviderHealthTracker } from '../../src/llm/health-tracker.js';
@@ -114,16 +114,19 @@ describe('ProviderHealthTracker', () => {
     expect(tracker.getHealth('anthropic').consecutiveFailures).toBe(0);
   });
 
-  it('recovers from cooldown after timeout', async () => {
+  it('recovers from cooldown after timeout', () => {
+    vi.useFakeTimers();
+
     tracker.recordFailure('anthropic');
     tracker.recordFailure('anthropic');
     tracker.recordFailure('anthropic');
     expect(tracker.isAvailable('anthropic')).toBe(false);
 
-    // Wait for cooldown to expire
-    await new Promise((r) => setTimeout(r, 150));
+    vi.advanceTimersByTime(150);
     expect(tracker.getStatus('anthropic')).toBe('degraded');
     expect(tracker.isAvailable('anthropic')).toBe(true);
+
+    vi.useRealTimers();
   });
 });
 
