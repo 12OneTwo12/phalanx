@@ -13,6 +13,8 @@ const schema = {
   action: z.enum(['create', 'view', 'list']).describe('PR action to perform'),
   title: z.string().optional().describe('PR title (required for create)'),
   body: z.string().optional().describe('PR body/description (used with create)'),
+  base: z.string().optional().describe('Base branch for PR (used with create, default: repo default branch)'),
+  head: z.string().optional().describe('Head branch for PR (used with create, default: current branch)'),
   number: z.number().optional().describe('PR number (required for view)'),
 };
 
@@ -43,6 +45,12 @@ export const githubPrTool: Tool<typeof schema> = {
           args = ['pr', 'create', '--title', params.title];
           if (params.body) {
             args.push('--body', params.body);
+          }
+          if (params.base) {
+            args.push('--base', params.base);
+          }
+          if (params.head) {
+            args.push('--head', params.head);
           }
           break;
         }
