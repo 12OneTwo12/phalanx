@@ -6,7 +6,7 @@ import type { HeartbeatContext, HeartbeatReport, HeartbeatReportProposal } from 
 
 /**
  * Generates heartbeat reports from context snapshots.
- * Stateless — each call produces an independent report.
+ * Tracks previous context internally to detect changes between consecutive reports.
  */
 export class HeartbeatReporter {
   private lastContext: HeartbeatContext | null = null;

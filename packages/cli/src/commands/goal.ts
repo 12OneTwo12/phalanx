@@ -12,7 +12,7 @@ goalCommand
   .command('add')
   .description('Add a new goal')
   .argument('<description>', 'Goal description')
-  .action((description: string) => {
+  .action(async (description: string) => {
     const config = loadConfig();
     if (!config) {
       logger.error('Phalanx not initialized. Run "phalanx init" first.');
@@ -22,15 +22,20 @@ goalCommand
 
     // Connect to database and create goal
     try {
-      const { DatabaseManager, GoalRepository, migrateUp } = require('@phalanx/core');
-      const db = DatabaseManager.create({ path: config.dbPath });
-      migrateUp(db.raw);
-      const goalRepo = new GoalRepository(db.orm);
-      const { GoalManager } = require('@phalanx/core');
-      const manager = new GoalManager(
+      const core = await import('@phalanx/core');
+      const db = core.DatabaseManager.create({ path: config.dbPath });
+      core.migrateUp(db);
+      const goalRepo = new core.GoalRepository(db.orm);
+      const epicStub: Pick<InstanceType<typeof core.EpicRepository>, 'findByGoalId'> = {
+        findByGoalId: () => [],
+      };
+      const ticketStub: Pick<InstanceType<typeof core.TicketRepository>, 'findByEpicId'> = {
+        findByEpicId: () => [],
+      };
+      const manager = new core.GoalManager(
         goalRepo,
-        { findByGoalId: () => [] } as any,
-        { findByEpicId: () => [] } as any,
+        epicStub as InstanceType<typeof core.EpicRepository>,
+        ticketStub as InstanceType<typeof core.TicketRepository>,
       );
       const goal = manager.create(description);
       logger.success(`Goal created: ${goal.id}`);
@@ -45,7 +50,7 @@ goalCommand
 goalCommand
   .command('list')
   .description('List all goals')
-  .action(() => {
+  .action(async () => {
     const config = loadConfig();
     if (!config) {
       logger.error('Phalanx not initialized. Run "phalanx init" first.');
@@ -54,10 +59,10 @@ goalCommand
     }
 
     try {
-      const { DatabaseManager, GoalRepository, migrateUp } = require('@phalanx/core');
-      const db = DatabaseManager.create({ path: config.dbPath });
-      migrateUp(db.raw);
-      const goalRepo = new GoalRepository(db.orm);
+      const core = await import('@phalanx/core');
+      const db = core.DatabaseManager.create({ path: config.dbPath });
+      core.migrateUp(db);
+      const goalRepo = new core.GoalRepository(db.orm);
       const goals = goalRepo.findAll();
 
       if (goals.length === 0) {

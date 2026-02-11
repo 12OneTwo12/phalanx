@@ -61,6 +61,12 @@ export class HeartbeatScheduler {
    * If the target time hasn't been reached, re-arms with the remaining delay.
    */
   armTimer(): void {
+    // Clear any existing timer to prevent leaks
+    if (this.state.timer !== null) {
+      clearTimeout(this.state.timer);
+      this.state.timer = null;
+    }
+
     const totalDelay = this.remainingMs ?? this.getEffectiveDelay();
     this.remainingMs = null;
     const clampedDelay = Math.min(totalDelay, MAX_TIMER_DELAY_MS);
