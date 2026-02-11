@@ -1,4 +1,5 @@
 import type { ThinkingLevel } from './types.js';
+import { ModelCatalogRegistry } from './model-catalog.js';
 
 // ---------------------------------------------------------------------------
 // Thinking budget mappings per provider
@@ -48,30 +49,20 @@ export function resolveOpenAIThinking(level: ThinkingLevel): OpenAIThinkingConfi
 }
 
 // ---------------------------------------------------------------------------
-// Model-aware thinking support check
+// Model-aware thinking support check (uses ModelCatalogRegistry as single source)
 // ---------------------------------------------------------------------------
 
-const THINKING_CAPABLE_MODELS: Record<string, boolean> = {
-  'claude-opus-4-6': true,
-  'claude-opus-4': true,
-  'claude-sonnet-4-5': true,
-  'claude-sonnet-4': true,
-  'o1': true,
-  'o1-mini': true,
-  'o3': true,
-  'o3-mini': true,
-  'o4-mini': true,
-};
+const DEFAULT_CATALOG = new ModelCatalogRegistry();
 
-export function supportsThinking(model: string): boolean {
-  // Check exact match first
-  if (model in THINKING_CAPABLE_MODELS) {
-    return THINKING_CAPABLE_MODELS[model];
-  }
-  // Check prefix match (e.g., 'claude-opus-4-6-20250414')
-  for (const key of Object.keys(THINKING_CAPABLE_MODELS)) {
-    if (model.startsWith(key)) {
-      return THINKING_CAPABLE_MODELS[key];
+export function supportsThinking(
+  model: string,
+  catalog: ModelCatalogRegistry = DEFAULT_CATALOG,
+): boolean {
+  for (const entry of catalog.getAllEntries()) {
+    const matches =
+      entry.id === model || model.startsWith(entry.id) || entry.id.startsWith(model);
+    if (matches) {
+      return entry.compat?.supportsThinking === true || entry.reasoning === true;
     }
   }
   return false;
@@ -84,7 +75,8 @@ export function supportsThinking(model: string): boolean {
 export function effectiveThinkingLevel(
   requested: ThinkingLevel | undefined,
   model: string,
+  catalog?: ModelCatalogRegistry,
 ): ThinkingLevel {
   if (!requested || requested === 'off') return 'off';
-  return supportsThinking(model) ? requested : 'off';
+  return supportsThinking(model, catalog) ? requested : 'off';
 }

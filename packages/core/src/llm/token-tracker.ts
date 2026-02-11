@@ -1,27 +1,5 @@
 import type { TokenUsageRecord, TokenUsageSummary } from './types.js';
-
-// ---------------------------------------------------------------------------
-// Known model costs (per 1k tokens)
-// ---------------------------------------------------------------------------
-
-const MODEL_COSTS: Record<string, { input: number; output: number }> = {
-  'claude-opus-4-6': { input: 0.015, output: 0.075 },
-  'claude-sonnet-4-5': { input: 0.003, output: 0.015 },
-  'claude-haiku-4-5': { input: 0.0008, output: 0.004 },
-  'gpt-4o': { input: 0.0025, output: 0.01 },
-  'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
-  'o3': { input: 0.01, output: 0.04 },
-  'o3-mini': { input: 0.0011, output: 0.0044 },
-  'o4-mini': { input: 0.0011, output: 0.0044 },
-};
-
-function findCost(model: string): { input: number; output: number } {
-  if (model in MODEL_COSTS) return MODEL_COSTS[model];
-  for (const [key, cost] of Object.entries(MODEL_COSTS)) {
-    if (model.startsWith(key)) return cost;
-  }
-  return { input: 0, output: 0 };
-}
+import { ModelCatalogRegistry } from './model-catalog.js';
 
 // ---------------------------------------------------------------------------
 // TokenTracker — in-memory tracker (persists to DB in W3)
@@ -29,6 +7,11 @@ function findCost(model: string): { input: number; output: number } {
 
 export class TokenTracker {
   private records: TokenUsageRecord[] = [];
+  private catalog: ModelCatalogRegistry;
+
+  constructor(catalog?: ModelCatalogRegistry) {
+    this.catalog = catalog ?? new ModelCatalogRegistry();
+  }
 
   record(usage: TokenUsageRecord): void {
     this.records.push({ ...usage, timestamp: usage.timestamp ?? new Date() });
@@ -53,9 +36,13 @@ export class TokenTracker {
     let totalCost = 0;
 
     for (const r of filtered) {
-      const cost = findCost(r.model);
+      const entry = this.findCatalogEntry(r.provider, r.model);
+      const cost = entry?.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+
+      // Catalog costs are per 1M tokens
       const recordCost =
-        (r.inputTokens / 1000) * cost.input + (r.outputTokens / 1000) * cost.output;
+        (r.inputTokens * cost.input) / 1_000_000 +
+        (r.outputTokens * cost.output) / 1_000_000;
 
       totalInput += r.inputTokens;
       totalOutput += r.outputTokens;
@@ -106,5 +93,21 @@ export class TokenTracker {
   /** Get raw record count */
   get count(): number {
     return this.records.length;
+  }
+
+  /** Find catalog entry by provider+model with prefix-match fallback */
+  private findCatalogEntry(provider: string, model: string) {
+    // Exact match
+    const exact = this.catalog.find(provider, model);
+    if (exact) return exact;
+
+    // Prefix match
+    const providerModels = this.catalog.getProviderModels(provider);
+    for (const entry of providerModels) {
+      if (model.startsWith(entry.id) || entry.id.startsWith(model)) {
+        return entry;
+      }
+    }
+    return undefined;
   }
 }
