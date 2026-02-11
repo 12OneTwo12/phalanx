@@ -6,6 +6,7 @@ import type {
   ToolCallResult,
   ToolCall,
   ProviderConfig,
+  ProviderFactory,
   Message,
   MessageContent,
 } from '../types.js';
@@ -41,6 +42,12 @@ interface OllamaListResponse {
 // ---------------------------------------------------------------------------
 // OllamaProvider — local model execution via Ollama HTTP API
 // ---------------------------------------------------------------------------
+
+export const ollamaProviderFactory: ProviderFactory = {
+  name: 'ollama',
+  shouldActivate: () => true, // Local provider, always registered
+  create: (config) => new OllamaProvider(config),
+};
 
 export class OllamaProvider implements LLMProvider {
   readonly name = 'ollama';

@@ -8,6 +8,7 @@ import type {
   ToolCall,
   TokenUsage,
   ProviderConfig,
+  ProviderFactory,
   Message,
 } from '../types.js';
 import { effectiveThinkingLevel, resolveAnthropicThinking } from '../thinking-level.js';
@@ -229,6 +230,12 @@ export class AnthropicProvider implements LLMProvider {
     }
   }
 }
+
+export const anthropicProviderFactory: ProviderFactory = {
+  name: 'anthropic',
+  shouldActivate: (config, env) => !!(config.apiKey || env.ANTHROPIC_API_KEY),
+  create: (config) => new AnthropicProvider(config),
+};
 
 function mapStopReason(
   reason: string | null,

@@ -8,6 +8,7 @@ import type {
   ToolCall,
   TokenUsage,
   ProviderConfig,
+  ProviderFactory,
   Message,
   MessageContent,
 } from '../types.js';
@@ -242,6 +243,12 @@ export class OpenAIProvider implements LLMProvider {
     }
   }
 }
+
+export const openaiProviderFactory: ProviderFactory = {
+  name: 'openai',
+  shouldActivate: (config, env) => !!(config.apiKey || env.OPENAI_API_KEY),
+  create: (config) => new OpenAIProvider(config),
+};
 
 function mapStopReason(
   reason: string | null | undefined,

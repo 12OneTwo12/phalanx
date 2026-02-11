@@ -314,6 +314,19 @@ export interface ModelCatalogEntry extends ModelDefinition {
 }
 
 // ---------------------------------------------------------------------------
+// Provider factory (plugin pattern for extensible provider registration)
+// ---------------------------------------------------------------------------
+
+export interface ProviderFactory {
+  /** Provider identifier (e.g., 'anthropic') */
+  readonly name: string;
+  /** Determine if this provider should be activated given config and env */
+  shouldActivate(config: ProviderConfig, env: Record<string, string | undefined>): boolean;
+  /** Create the provider instance */
+  create(config: ProviderConfig): LLMProvider;
+}
+
+// ---------------------------------------------------------------------------
 // Agent model requirements
 // ---------------------------------------------------------------------------
 

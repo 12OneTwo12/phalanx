@@ -6,6 +6,7 @@ import type {
   ToolCallResult,
   ToolCall,
   ProviderConfig,
+  ProviderFactory,
   Message,
   MessageContent,
 } from '../types.js';
@@ -35,6 +36,12 @@ interface GeminiResponse {
 // ---------------------------------------------------------------------------
 // GeminiProvider — Google Gemini API via REST
 // ---------------------------------------------------------------------------
+
+export const geminiProviderFactory: ProviderFactory = {
+  name: 'gemini',
+  shouldActivate: (config, env) => !!(config.apiKey || env.GEMINI_API_KEY),
+  create: (config) => new GeminiProvider(config),
+};
 
 export const GEMINI_MODELS = [
   'gemini-2.5-pro',

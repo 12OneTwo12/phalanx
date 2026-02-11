@@ -1,25 +1,36 @@
-import type { ProviderConfig } from './types.js';
+import type { ProviderConfig, ProviderFactory } from './types.js';
 import { ProviderRegistry } from './provider-registry.js';
 import { ProviderHealthTracker } from './health-tracker.js';
 import { ModelResolver } from './model-resolver.js';
-import { AnthropicProvider } from './providers/anthropic.js';
-import { OpenAIProvider } from './providers/openai.js';
-import { OllamaProvider } from './providers/ollama.js';
-import { GeminiProvider } from './providers/gemini.js';
+import { anthropicProviderFactory } from './providers/anthropic.js';
+import { openaiProviderFactory } from './providers/openai.js';
+import { ollamaProviderFactory } from './providers/ollama.js';
+import { geminiProviderFactory } from './providers/gemini.js';
+
+// ---------------------------------------------------------------------------
+// Built-in provider factories
+// ---------------------------------------------------------------------------
+
+export const BUILT_IN_PROVIDER_FACTORIES: ProviderFactory[] = [
+  anthropicProviderFactory,
+  openaiProviderFactory,
+  ollamaProviderFactory,
+  geminiProviderFactory,
+];
 
 // ---------------------------------------------------------------------------
 // Factory: create fully configured resolver
 // ---------------------------------------------------------------------------
 
 export interface PhalanxLLMConfig {
-  providers?: {
-    anthropic?: ProviderConfig;
-    openai?: ProviderConfig;
-    ollama?: ProviderConfig;
-    gemini?: ProviderConfig;
-  };
+  /** Per-provider configuration, keyed by provider name */
+  providers?: Record<string, ProviderConfig>;
+  /** System-wide default model (provider/model format) */
   systemDefault?: string;
+  /** Cooldown duration in ms after consecutive failures */
   cooldownMs?: number;
+  /** Additional provider factories to register beyond built-ins */
+  additionalFactories?: ProviderFactory[];
 }
 
 export function createLLMStack(config: PhalanxLLMConfig = {}): {
@@ -30,24 +41,14 @@ export function createLLMStack(config: PhalanxLLMConfig = {}): {
   const registry = new ProviderRegistry();
   const healthTracker = new ProviderHealthTracker(config.cooldownMs);
 
-  // Register providers (only if API key is available or it's a local provider)
-  const anthropicConfig = config.providers?.anthropic ?? {};
-  if (anthropicConfig.apiKey || process.env.ANTHROPIC_API_KEY) {
-    registry.register(new AnthropicProvider(anthropicConfig));
-  }
+  const env = process.env as Record<string, string | undefined>;
+  const factories = [...BUILT_IN_PROVIDER_FACTORIES, ...(config.additionalFactories ?? [])];
 
-  const openaiConfig = config.providers?.openai ?? {};
-  if (openaiConfig.apiKey || process.env.OPENAI_API_KEY) {
-    registry.register(new OpenAIProvider(openaiConfig));
-  }
-
-  // Ollama is always registered (local, might not be running)
-  const ollamaConfig = config.providers?.ollama ?? {};
-  registry.register(new OllamaProvider(ollamaConfig));
-
-  const geminiConfig = config.providers?.gemini ?? {};
-  if (geminiConfig.apiKey || process.env.GEMINI_API_KEY) {
-    registry.register(new GeminiProvider(geminiConfig));
+  for (const factory of factories) {
+    const providerConfig = config.providers?.[factory.name] ?? {};
+    if (factory.shouldActivate(providerConfig, env)) {
+      registry.register(factory.create(providerConfig));
+    }
   }
 
   const systemDefault = config.systemDefault ?? 'anthropic/claude-sonnet-4-5-20250929';
