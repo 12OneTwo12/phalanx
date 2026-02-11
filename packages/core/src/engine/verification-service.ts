@@ -44,21 +44,19 @@ export class VerificationService extends EventEmitter {
       this.ticketRepo.update(ticketId, { status: newStatus });
       this.emit('verification:passed', { ticketId });
     } else {
-      // Failed — send back to in_progress for retry
-      const failedStatus = TicketStateMachine.transition('verification', 'fail');
+      // Failed — check retry count to decide escalation or retry
       const newRetryCount = ticket.retryCount + 1;
 
       if (newRetryCount >= ticket.maxRetries) {
-        // Max retries reached — mark as failed then escalate
+        // Max retries reached — escalate directly (skip intermediate 'failed' state in DB)
         this.ticketRepo.update(ticketId, {
-          status: 'failed',
+          status: 'escalated',
           retryCount: newRetryCount,
         });
-        // Escalate
-        const escalated = TicketStateMachine.transition('failed', 'escalate');
-        this.ticketRepo.update(ticketId, { status: escalated });
         this.emit('verification:escalated', { ticketId, retryCount: newRetryCount });
       } else {
+        // Send back to in_progress for retry
+        const failedStatus = TicketStateMachine.transition('verification', 'fail');
         this.ticketRepo.update(ticketId, {
           status: failedStatus,
           retryCount: newRetryCount,

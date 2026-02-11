@@ -74,9 +74,15 @@ export class Orchestrator extends EventEmitter {
         this.emit('ticket:failed', { ticketId: ticket.id, error: result.error });
       }
     } catch (err) {
-      // Unexpected error → mark as failed
+      // Unexpected error → attempt state machine transition, fallback to direct update
       try {
-        this.ticketRepo.update(ticket.id, { status: 'failed' });
+        const currentTicket = this.ticketRepo.findById(ticket.id);
+        if (currentTicket && TicketStateMachine.canTransition(currentTicket.status as import('./types.js').TicketStatus, 'error')) {
+          const failedStatus = TicketStateMachine.transition(currentTicket.status as import('./types.js').TicketStatus, 'error');
+          this.ticketRepo.update(ticket.id, { status: failedStatus });
+        } else {
+          this.ticketRepo.update(ticket.id, { status: 'failed' });
+        }
       } catch { /* Best effort */ }
       this.emit('ticket:error', { ticketId: ticket.id, error: String(err) });
     } finally {

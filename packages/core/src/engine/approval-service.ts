@@ -40,16 +40,12 @@ export class ApprovalService extends EventEmitter {
         break;
       }
       case 'modify': {
-        const updates: Record<string, unknown> = {};
-        if (request.modifications?.title) updates.title = request.modifications.title;
-        if (request.modifications?.description) updates.description = request.modifications.description;
-        if (request.modifications?.priority) updates.priority = request.modifications.priority;
-
-        this.ticketRepo.update(request.ticketId, updates);
-
-        // Auto-approve after modification
+        // Apply modifications and approve in a single update to avoid stale state
         const newStatus = TicketStateMachine.transition(ticket.status, 'approve');
         this.ticketRepo.update(request.ticketId, {
+          ...(request.modifications?.title && { title: request.modifications.title }),
+          ...(request.modifications?.description && { description: request.modifications.description }),
+          ...(request.modifications?.priority && { priority: request.modifications.priority }),
           status: newStatus,
           approvedAt: new Date().toISOString(),
         });
