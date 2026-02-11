@@ -43,3 +43,7 @@ coverage/
 
 # OS
 Thumbs.db
+
+# Phalanx runtime
+.phalanx/data/
+.phalanx/*.sqlite
