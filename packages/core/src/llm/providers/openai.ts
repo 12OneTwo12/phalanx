@@ -1,0 +1,259 @@
+import OpenAI from 'openai';
+import type {
+  LLMProvider,
+  ChatParams,
+  ChatResult,
+  ChatWithToolsParams,
+  ToolCallResult,
+  ToolCall,
+  TokenUsage,
+  ProviderConfig,
+  Message,
+  MessageContent,
+} from '../types.js';
+import { effectiveThinkingLevel } from '../thinking-level.js';
+
+// ---------------------------------------------------------------------------
+// OpenAI message conversion
+// ---------------------------------------------------------------------------
+
+function toOpenAIMessages(
+  messages: Message[],
+  systemPrompt?: string,
+): OpenAI.ChatCompletionMessageParam[] {
+  const result: OpenAI.ChatCompletionMessageParam[] = [];
+
+  if (systemPrompt) {
+    result.push({ role: 'system', content: systemPrompt });
+  }
+
+  for (const msg of messages) {
+    if (msg.role === 'system') {
+      result.push({ role: 'system', content: msg.content as string });
+      continue;
+    }
+
+    if (typeof msg.content === 'string') {
+      result.push({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      });
+      continue;
+    }
+
+    // Handle structured content
+    if (msg.role === 'assistant') {
+      const textParts = (msg.content as MessageContent[]).filter((c) => c.type === 'text');
+      const toolParts = (msg.content as MessageContent[]).filter((c) => c.type === 'tool_use');
+
+      const assistantMsg: OpenAI.ChatCompletionAssistantMessageParam = {
+        role: 'assistant',
+        content: textParts.map((c) => (c as { text: string }).text).join(''),
+      };
+
+      if (toolParts.length > 0) {
+        assistantMsg.tool_calls = toolParts.map((c) => {
+          const tc = c as { id: string; name: string; input: Record<string, unknown> };
+          return {
+            id: tc.id,
+            type: 'function' as const,
+            function: {
+              name: tc.name,
+              arguments: JSON.stringify(tc.input),
+            },
+          };
+        });
+      }
+
+      result.push(assistantMsg);
+    } else if (msg.role === 'user') {
+      // Check for tool results
+      const toolResults = (msg.content as MessageContent[]).filter(
+        (c) => c.type === 'tool_result',
+      );
+      const textParts = (msg.content as MessageContent[]).filter((c) => c.type === 'text');
+
+      for (const tr of toolResults) {
+        const toolResult = tr as { toolUseId: string; content: string };
+        result.push({
+          role: 'tool',
+          tool_call_id: toolResult.toolUseId,
+          content: toolResult.content,
+        });
+      }
+
+      if (textParts.length > 0) {
+        result.push({
+          role: 'user',
+          content: textParts.map((c) => (c as { text: string }).text).join(''),
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+function toOpenAITools(
+  tools: ChatWithToolsParams['tools'],
+): OpenAI.ChatCompletionTool[] {
+  return tools.map((t) => ({
+    type: 'function' as const,
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters,
+    },
+  }));
+}
+
+function extractUsage(usage?: OpenAI.CompletionUsage | null): TokenUsage {
+  return {
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: usage?.completion_tokens ?? 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// OpenAI reasoning models detection
+// ---------------------------------------------------------------------------
+
+function isReasoningModel(model: string): boolean {
+  return model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4');
+}
+
+// ---------------------------------------------------------------------------
+// OpenAIProvider
+// ---------------------------------------------------------------------------
+
+export const OPENAI_MODELS = [
+  'gpt-4o',
+  'gpt-4o-mini',
+  'o3',
+  'o3-mini',
+  'o4-mini',
+] as const;
+
+export class OpenAIProvider implements LLMProvider {
+  readonly name = 'openai';
+  readonly models: string[] = [...OPENAI_MODELS];
+
+  private client: OpenAI;
+  private config: ProviderConfig;
+
+  constructor(config: ProviderConfig = {}) {
+    this.config = config;
+    this.client = new OpenAI({
+      apiKey: config.apiKey || process.env.OPENAI_API_KEY,
+      baseURL: config.baseUrl,
+      maxRetries: config.maxRetries ?? 2,
+      timeout: config.timeout ?? 120_000,
+    });
+  }
+
+  async chat(params: ChatParams): Promise<ChatResult> {
+    const thinkingLevel = effectiveThinkingLevel(params.thinkingLevel, params.model);
+    const isReasoning = isReasoningModel(params.model);
+
+    const requestParams: OpenAI.ChatCompletionCreateParams = {
+      model: params.model,
+      messages: toOpenAIMessages(params.messages, params.systemPrompt),
+      ...(params.stopSequences && { stop: params.stopSequences }),
+    };
+
+    // Reasoning models use reasoning_effort instead of temperature/max_tokens
+    if (isReasoning && thinkingLevel !== 'off') {
+      (requestParams as Record<string, unknown>).reasoning_effort = thinkingLevel;
+    } else {
+      requestParams.max_tokens = params.maxTokens ?? 4096;
+      if (params.temperature !== undefined) {
+        requestParams.temperature = params.temperature;
+      }
+    }
+
+    const response = await this.client.chat.completions.create(requestParams);
+    const choice = response.choices[0];
+
+    return {
+      content: choice?.message?.content ?? '',
+      stopReason: mapStopReason(choice?.finish_reason),
+      usage: extractUsage(response.usage),
+      model: response.model,
+    };
+  }
+
+  async chatWithTools(params: ChatWithToolsParams): Promise<ToolCallResult> {
+    const thinkingLevel = effectiveThinkingLevel(params.thinkingLevel, params.model);
+    const isReasoning = isReasoningModel(params.model);
+
+    const requestParams: OpenAI.ChatCompletionCreateParams = {
+      model: params.model,
+      messages: toOpenAIMessages(params.messages, params.systemPrompt),
+      tools: toOpenAITools(params.tools),
+      ...(params.stopSequences && { stop: params.stopSequences }),
+    };
+
+    if (params.toolChoice) {
+      if (params.toolChoice === 'auto') {
+        requestParams.tool_choice = 'auto';
+      } else if (params.toolChoice === 'none') {
+        requestParams.tool_choice = 'none';
+      } else {
+        requestParams.tool_choice = {
+          type: 'function',
+          function: { name: params.toolChoice.name },
+        };
+      }
+    }
+
+    if (isReasoning && thinkingLevel !== 'off') {
+      (requestParams as Record<string, unknown>).reasoning_effort = thinkingLevel;
+    } else {
+      requestParams.max_tokens = params.maxTokens ?? 4096;
+      if (params.temperature !== undefined) {
+        requestParams.temperature = params.temperature;
+      }
+    }
+
+    const response = await this.client.chat.completions.create(requestParams);
+    const choice = response.choices[0];
+
+    const toolCalls: ToolCall[] = (choice?.message?.tool_calls ?? []).map((tc) => ({
+      id: tc.id,
+      name: tc.function.name,
+      input: JSON.parse(tc.function.arguments || '{}'),
+    }));
+
+    return {
+      content: choice?.message?.content ?? '',
+      toolCalls,
+      stopReason: mapStopReason(choice?.finish_reason),
+      usage: extractUsage(response.usage),
+      model: response.model,
+    };
+  }
+
+  async isAvailable(): Promise<boolean> {
+    try {
+      const key = this.config.apiKey || process.env.OPENAI_API_KEY;
+      return !!key;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function mapStopReason(
+  reason: string | null | undefined,
+): ChatResult['stopReason'] {
+  switch (reason) {
+    case 'stop':
+      return 'end_turn';
+    case 'length':
+      return 'max_tokens';
+    case 'tool_calls':
+      return 'tool_use';
+    default:
+      return 'end_turn';
+  }
+}
