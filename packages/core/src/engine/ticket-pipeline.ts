@@ -5,7 +5,7 @@
 import { EventEmitter } from 'node:events';
 import type { Ticket } from '../db/schema.js';
 import type { TicketExecutor } from './orchestrator.js';
-import type { VerificationService } from './verification-service.js';
+import type { VerificationStrategy } from './verification-service.js';
 import type { BranchManager } from './branch-manager.js';
 import type { PRController } from './pr/pr-controller.js';
 import type { PRCreator } from './pr/pr-creator.js';
@@ -17,7 +17,6 @@ import type { VerificationResult } from './types.js';
 // ---------------------------------------------------------------------------
 
 export type PipelineStage =
-  | 'branch_creation'
   | 'execution'
   | 'verification'
   | 'pr_decision'
@@ -58,7 +57,7 @@ export class TicketPipeline extends EventEmitter {
 
   constructor(
     private readonly executor: TicketExecutor,
-    private readonly verificationService: VerificationService,
+    private readonly verificationStrategy: VerificationStrategy,
     private readonly branchManager: BranchManager,
     private readonly prController: PRController,
     private readonly prCreator: PRCreator,
@@ -105,7 +104,7 @@ export class TicketPipeline extends EventEmitter {
       this.emit('pipeline:stage', { ticketId: ticket.id, stage: 'verification' });
       let verificationResult: VerificationResult;
       try {
-        verificationResult = await this.verificationService.verify(ticket.id);
+        verificationResult = await this.verificationStrategy.verify(ticket.id);
       } catch (err) {
         return {
           ticketId: ticket.id,

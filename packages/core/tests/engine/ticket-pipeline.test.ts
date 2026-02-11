@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TicketPipeline } from '../../src/engine/ticket-pipeline.js';
 import type { TicketExecutor } from '../../src/engine/orchestrator.js';
-import type { VerificationService } from '../../src/engine/verification-service.js';
+import type { VerificationStrategy } from '../../src/engine/verification-service.js';
 import type { BranchManager } from '../../src/engine/branch-manager.js';
 import type { PRController } from '../../src/engine/pr/pr-controller.js';
 import type { PRCreator } from '../../src/engine/pr/pr-creator.js';
@@ -19,7 +19,7 @@ function makeTicket(): Ticket {
 
 describe('TicketPipeline', () => {
   let executor: TicketExecutor;
-  let verificationService: VerificationService;
+  let verificationService: VerificationStrategy;
   let branchManager: BranchManager;
   let prController: PRController;
   let prCreator: PRCreator;
@@ -31,7 +31,7 @@ describe('TicketPipeline', () => {
       verify: vi.fn(async () => ({
         ticketId: 't1', status: 'passed' as const, checks: [],
       })),
-    } as unknown as VerificationService;
+    } as VerificationStrategy;
     branchManager = {
       getChangedFiles: vi.fn(async () => ['a.ts']),
       getDiff: vi.fn(async () => 'diff'),
