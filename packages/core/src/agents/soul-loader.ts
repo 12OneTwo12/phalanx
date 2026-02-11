@@ -1,4 +1,4 @@
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { AgentSoulConfig, AgentRole } from './types.js';
 
@@ -25,21 +25,24 @@ export class SoulLoader {
    * Reads SOUL.md, IDENTITY.md, MEMORY.md, SKILLS.md from templatesDir/{role}/.
    * Missing files result in empty strings.
    */
-  load(role: AgentRole): AgentSoulConfig {
+  async load(role: AgentRole): Promise<AgentSoulConfig> {
     const roleDir = path.join(this.templatesDir, role);
 
-    return {
-      soul: this.readFile(path.join(roleDir, 'SOUL.md')),
-      identity: this.readFile(path.join(roleDir, 'IDENTITY.md')),
-      memory: this.readFile(path.join(roleDir, 'MEMORY.md')),
-      skills: this.readFile(path.join(roleDir, 'SKILLS.md')),
-    };
+    const [soul, identity, memory, skills] = await Promise.all([
+      this.readFile(path.join(roleDir, 'SOUL.md')),
+      this.readFile(path.join(roleDir, 'IDENTITY.md')),
+      this.readFile(path.join(roleDir, 'MEMORY.md')),
+      this.readFile(path.join(roleDir, 'SKILLS.md')),
+    ]);
+
+    return { soul, identity, memory, skills };
   }
 
   /** Read a file, returning empty string if it doesn't exist. */
-  private readFile(filePath: string): string {
+  private async readFile(filePath: string): Promise<string> {
     try {
-      return fs.readFileSync(filePath, 'utf-8').trim();
+      const content = await fs.readFile(filePath, 'utf-8');
+      return content.trim();
     } catch {
       return '';
     }

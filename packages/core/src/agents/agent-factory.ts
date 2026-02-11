@@ -55,9 +55,9 @@ export class AgentFactory {
    *   3. Look up LLMProvider
    *   4. Create AgentExecutor with provider + tool registry + token tracker
    */
-  create(options: CreateAgentOptions): { executor: AgentExecutor; config: AgentConfig } {
+  async create(options: CreateAgentOptions): Promise<{ executor: AgentExecutor; config: AgentConfig }> {
     // 1. Load soul
-    const baseSoul = this.soulLoader.load(options.role);
+    const baseSoul = await this.soulLoader.load(options.role);
     const soul: AgentSoulConfig = {
       soul: options.soulOverride?.soul ?? baseSoul.soul,
       identity: options.soulOverride?.identity ?? baseSoul.identity,
