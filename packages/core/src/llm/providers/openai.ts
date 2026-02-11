@@ -43,51 +43,50 @@ export function toOpenAIMessages(
       continue;
     }
 
-    // Handle structured content
+    // Handle structured content using discriminated union narrowing
+    const contents = msg.content as MessageContent[];
+
     if (msg.role === 'assistant') {
-      const textParts = (msg.content as MessageContent[]).filter((c) => c.type === 'text');
-      const toolParts = (msg.content as MessageContent[]).filter((c) => c.type === 'tool_use');
+      let text = '';
+      const toolCalls: OpenAI.ChatCompletionMessageToolCall[] = [];
+
+      for (const c of contents) {
+        if (c.type === 'text') {
+          text += c.text;
+        } else if (c.type === 'tool_use') {
+          toolCalls.push({
+            id: c.id,
+            type: 'function',
+            function: { name: c.name, arguments: JSON.stringify(c.input) },
+          });
+        }
+      }
 
       const assistantMsg: OpenAI.ChatCompletionAssistantMessageParam = {
         role: 'assistant',
-        content: textParts.map((c) => (c as { text: string }).text).join(''),
+        content: text,
       };
-
-      if (toolParts.length > 0) {
-        assistantMsg.tool_calls = toolParts.map((c) => {
-          const tc = c as { id: string; name: string; input: Record<string, unknown> };
-          return {
-            id: tc.id,
-            type: 'function' as const,
-            function: {
-              name: tc.name,
-              arguments: JSON.stringify(tc.input),
-            },
-          };
-        });
+      if (toolCalls.length > 0) {
+        assistantMsg.tool_calls = toolCalls;
       }
-
       result.push(assistantMsg);
     } else if (msg.role === 'user') {
-      const toolResults = (msg.content as MessageContent[]).filter(
-        (c) => c.type === 'tool_result',
-      );
-      const textParts = (msg.content as MessageContent[]).filter((c) => c.type === 'text');
+      let text = '';
 
-      for (const tr of toolResults) {
-        const toolResult = tr as { toolUseId: string; content: string };
-        result.push({
-          role: 'tool',
-          tool_call_id: toolResult.toolUseId,
-          content: toolResult.content,
-        });
+      for (const c of contents) {
+        if (c.type === 'tool_result') {
+          result.push({
+            role: 'tool',
+            tool_call_id: c.toolUseId,
+            content: c.content,
+          });
+        } else if (c.type === 'text') {
+          text += c.text;
+        }
       }
 
-      if (textParts.length > 0) {
-        result.push({
-          role: 'user',
-          content: textParts.map((c) => (c as { text: string }).text).join(''),
-        });
+      if (text) {
+        result.push({ role: 'user', content: text });
       }
     }
   }
@@ -112,6 +111,8 @@ function extractUsage(usage?: OpenAI.CompletionUsage | null): TokenUsage {
   return {
     inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: usage?.completion_tokens ?? 0,
+    // reasoning_tokens is a subset of completion_tokens (already included in outputTokens)
+    thinkingTokens: usage?.completion_tokens_details?.reasoning_tokens ?? undefined,
   };
 }
 
