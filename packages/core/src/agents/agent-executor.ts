@@ -15,11 +15,14 @@ import { zodToToolDefinition } from '../tools/tool-schema.js';
 import type { TokenTracker } from '../llm/token-tracker.js';
 import type { AgentConfig, AgentExecutionResult, AgentStatus } from './types.js';
 import { IterationGuard } from './iteration-guard.js';
-import { formatToolError, shouldEscalate } from './error-recovery.js';
+import { formatToolError, shouldEscalate, isRetryableError } from './error-recovery.js';
 
 // ---------------------------------------------------------------------------
 // AgentExecutor — the core agent execution loop
 // ---------------------------------------------------------------------------
+
+/** Maximum number of retries for transient LLM errors */
+const MAX_LLM_RETRIES = 2;
 
 export class AgentExecutor {
   constructor(
@@ -85,19 +88,34 @@ export class AgentExecutor {
         });
       }
 
-      // Call LLM
+      // Call LLM with retry for transient errors
       let result: ToolCallResult;
-      try {
-        result = await this.provider.chatWithTools({
-          model: config.model.model,
-          messages,
-          systemPrompt,
-          tools: toolDefinitions,
-          thinkingLevel: config.thinkingLevel,
-          maxTokens: 4096,
-          temperature: config.temperature,
-        });
-      } catch (error) {
+      let lastError: unknown;
+      let succeeded = false;
+
+      for (let attempt = 0; attempt <= MAX_LLM_RETRIES; attempt++) {
+        try {
+          result = await this.provider.chatWithTools({
+            model: config.model.model,
+            messages,
+            systemPrompt,
+            tools: toolDefinitions,
+            thinkingLevel: config.thinkingLevel,
+            maxTokens: 4096,
+            temperature: config.temperature,
+          });
+          succeeded = true;
+          break;
+        } catch (error) {
+          lastError = error;
+          if (attempt < MAX_LLM_RETRIES && isRetryableError(error)) {
+            continue;
+          }
+          break;
+        }
+      }
+
+      if (!succeeded) {
         return this.buildResult(
           'error',
           '',
@@ -105,7 +123,7 @@ export class AgentExecutor {
           iterations,
           totalUsage,
           toolCallCount,
-          error instanceof Error ? error.message : String(error),
+          lastError instanceof Error ? lastError.message : String(lastError),
         );
       }
 
