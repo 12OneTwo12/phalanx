@@ -55,9 +55,15 @@ export class ConventionWatcher extends EventEmitter {
     this.fsWatcher.on('unlink', (p) => this.enqueue('removed', p));
     this.fsWatcher.on('error', (err) => this.emit('error', err));
 
-    // Wait for watcher to be ready
-    return new Promise((resolve) => {
-      this.fsWatcher!.on('ready', () => resolve());
+    // Wait for watcher to be ready with a timeout to prevent hanging
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error(`ConventionWatcher: ready timeout after 10s for ${this.watchDir}`));
+      }, 10_000);
+      this.fsWatcher!.on('ready', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
     });
   }
 

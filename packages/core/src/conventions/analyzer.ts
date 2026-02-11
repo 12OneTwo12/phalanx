@@ -133,7 +133,12 @@ export class ConventionAnalyzer {
   }
 
   private detectCommitStyle(_dir: string): string {
-    // Default assumption — could be enhanced with git log parsing
+    // TODO: Implement actual git log parsing to detect commit style.
+    // Should run `git log --oneline -n 50` and analyze patterns:
+    //   - conventional: "type(scope): message"
+    //   - angular: "type(scope): message" (similar but different types)
+    //   - freeform: no pattern detected
+    // Currently hardcoded — always returns 'conventional'.
     return 'conventional';
   }
 

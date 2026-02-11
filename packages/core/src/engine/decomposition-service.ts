@@ -88,6 +88,24 @@ export class DecompositionService extends EventEmitter {
       createdEpics.push({ epic, tickets });
     }
 
+    // Resolve title-based dependsOn references to actual ticket IDs.
+    // The decomposition strategy produces dependency refs as ticket titles,
+    // but the orchestrator resolves dependencies by ticket ID.
+    const titleToId = new Map<string, string>();
+    for (const { tickets } of createdEpics) {
+      for (const t of tickets) {
+        titleToId.set(t.title, t.id);
+      }
+    }
+    for (const { tickets } of createdEpics) {
+      for (const ticket of tickets) {
+        if (!ticket.dependsOn) continue;
+        const deps: string[] = JSON.parse(ticket.dependsOn);
+        const resolvedDeps = deps.map((ref) => titleToId.get(ref) ?? ref);
+        this.ticketRepo.update(ticket.id, { dependsOn: JSON.stringify(resolvedDeps) });
+      }
+    }
+
     this.emit('decomposition:complete', { goalId, epicCount: createdEpics.length });
 
     return {

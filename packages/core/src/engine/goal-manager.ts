@@ -46,7 +46,12 @@ export class GoalManager extends EventEmitter {
     return goal;
   }
 
-  /** Calculate and update progress for a goal based on ticket completion */
+  /**
+   * Calculate and update progress for a goal based on ticket completion.
+   * TODO: Optimize N+1 query — currently fetches tickets per-epic in a loop.
+   * Could use a single JOIN query (e.g., drizzle-orm inArray on epicIds) to
+   * fetch all tickets for a goal's epics in one round-trip.
+   */
   calculateProgress(goalId: string): number {
     const epics = this.epicRepo.findByGoalId(goalId);
     if (epics.length === 0) return 0;

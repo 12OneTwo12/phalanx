@@ -100,7 +100,10 @@ export class Orchestrator extends EventEmitter {
     try {
       deps = JSON.parse(ticket.dependsOn) as string[];
     } catch {
-      return true; // Malformed deps — treat as no deps
+      // TODO: Add structured warning logging here. Malformed dependsOn JSON
+      // is silently treated as "no dependencies", which could cause tickets to
+      // execute out of order. Consider emitting a 'warning' event or using a logger.
+      return true;
     }
 
     return deps.every((depId) => {

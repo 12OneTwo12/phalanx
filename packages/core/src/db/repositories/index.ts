@@ -1,4 +1,5 @@
 export { type Repository } from './types.js';
+export { BaseRepository } from './base.repository.js';
 export { GoalRepository } from './goal.repository.js';
 export { EpicRepository } from './epic.repository.js';
 export { TicketRepository } from './ticket.repository.js';

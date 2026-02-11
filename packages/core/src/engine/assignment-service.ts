@@ -17,6 +17,9 @@ const CATEGORY_ROLE_MAP: Record<string, Agent['role']> = {
 };
 
 export class AssignmentService extends EventEmitter {
+  /** Tracks the last assigned index per role for round-robin distribution */
+  private readonly roundRobinIndex = new Map<string, number>();
+
   constructor(
     private readonly ticketRepo: TicketRepository,
     private readonly agentRepo: AgentRepository,
@@ -69,8 +72,11 @@ export class AssignmentService extends EventEmitter {
       return null;
     }
 
-    // Pick the first available agent
-    const agent = candidates[0];
+    // Round-robin: pick the next candidate based on role index
+    const lastIndex = this.roundRobinIndex.get(targetRole) ?? -1;
+    const nextIndex = (lastIndex + 1) % candidates.length;
+    this.roundRobinIndex.set(targetRole, nextIndex);
+    const agent = candidates[nextIndex];
     this.assign(ticketId, agent.id);
     return agent.id;
   }
