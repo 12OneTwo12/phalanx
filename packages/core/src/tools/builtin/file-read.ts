@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
 import { z } from 'zod';
 import type { Tool, ToolExecutionContext, ToolResult } from '../types.js';
+import { resolveSafePath } from './path-utils.js';
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -12,18 +12,6 @@ const schema = {
   offset: z.number().optional().describe('Start reading from this line number (1-based)'),
   limit: z.number().optional().describe('Maximum number of lines to read'),
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function resolveSafePath(filePath: string, workingDirectory: string): string | null {
-  const resolved = path.resolve(workingDirectory, filePath);
-  if (!resolved.startsWith(workingDirectory + path.sep) && resolved !== workingDirectory) {
-    return null;
-  }
-  return resolved;
-}
 
 function formatLines(lines: string[], startLine: number): string {
   const maxLineNum = startLine + lines.length - 1;
@@ -53,7 +41,7 @@ export const fileReadTool: Tool<typeof schema> = {
     context: ToolExecutionContext,
   ): Promise<ToolResult> {
     try {
-      const resolved = resolveSafePath(params.path, context.workingDirectory);
+      const resolved = await resolveSafePath(params.path, context.workingDirectory);
       if (!resolved) {
         return { success: false, content: '', error: 'Path traversal denied' };
       }

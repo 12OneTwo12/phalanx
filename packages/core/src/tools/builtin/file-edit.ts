@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
 import { z } from 'zod';
 import type { Tool, ToolExecutionContext, ToolResult } from '../types.js';
+import { resolveSafePath } from './path-utils.js';
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -16,18 +16,6 @@ const schema = {
     .optional()
     .describe('Replace all occurrences (default: false, errors if multiple matches)'),
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function resolveSafePath(filePath: string, workingDirectory: string): string | null {
-  const resolved = path.resolve(workingDirectory, filePath);
-  if (!resolved.startsWith(workingDirectory + path.sep) && resolved !== workingDirectory) {
-    return null;
-  }
-  return resolved;
-}
 
 function countOccurrences(source: string, search: string): number {
   let count = 0;
@@ -56,7 +44,7 @@ export const fileEditTool: Tool<typeof schema> = {
     context: ToolExecutionContext,
   ): Promise<ToolResult> {
     try {
-      const resolved = resolveSafePath(params.path, context.workingDirectory);
+      const resolved = await resolveSafePath(params.path, context.workingDirectory);
       if (!resolved) {
         return { success: false, content: '', error: 'Path traversal denied' };
       }
