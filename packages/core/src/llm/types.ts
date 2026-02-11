@@ -330,6 +330,10 @@ export interface ProviderFactory {
 // Agent model requirements
 // ---------------------------------------------------------------------------
 
+/**
+ * Agent-level model requirements for the agent orchestration layer.
+ * Reserved for W2 (Agent Framework) — not consumed by W1 LLM layer.
+ */
 export interface AgentModelRequirement {
   /** Required provider (e.g., 'anthropic' for thinking support) */
   requiresProvider?: string;
