@@ -98,8 +98,10 @@ export function toAnthropicMessages(
               content: c.content,
               is_error: c.isError,
             };
-          default:
-            return { type: 'text' as const, text: '' };
+          default: {
+            const _exhaustiveCheck: never = c;
+            throw new Error(`Unhandled content type: ${(_exhaustiveCheck as { type: string }).type}`);
+          }
         }
       });
 

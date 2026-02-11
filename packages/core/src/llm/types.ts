@@ -257,7 +257,9 @@ export interface TokenUsageRecord {
   model: string;
   inputTokens: number;
   outputTokens: number;
-  thinkingTokens: number;
+  thinkingTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   goalId?: string;
   ticketId?: string;
   agentId?: string;

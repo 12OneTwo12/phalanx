@@ -15,8 +15,11 @@ import type {
 // ---------------------------------------------------------------------------
 
 interface OllamaChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  tool_calls?: Array<{
+    function: { name: string; arguments: Record<string, unknown> };
+  }>;
 }
 
 interface OllamaChatResponse {
@@ -48,6 +51,76 @@ export const ollamaProviderFactory: ProviderFactory = {
   create: (config, env) => new OllamaProvider(config, env),
 };
 
+// ---------------------------------------------------------------------------
+// Message conversion (exported for testing, consistent with other providers)
+// ---------------------------------------------------------------------------
+
+export function toOllamaMessages(
+  messages: Message[],
+  systemPrompt?: string,
+): OllamaChatMessage[] {
+  const result: OllamaChatMessage[] = [];
+
+  if (systemPrompt) {
+    result.push({ role: 'system', content: systemPrompt });
+  }
+
+  for (const msg of messages) {
+    if (typeof msg.content === 'string') {
+      result.push({ role: msg.role, content: msg.content });
+      continue;
+    }
+
+    if (msg.role === 'assistant') {
+      let text = '';
+      const toolCalls: OllamaChatMessage['tool_calls'] = [];
+
+      for (const c of msg.content) {
+        if (c.type === 'text') {
+          text += c.text;
+        } else if (c.type === 'tool_use') {
+          toolCalls.push({
+            function: { name: c.name, arguments: c.input },
+          });
+        }
+      }
+
+      const assistantMsg: OllamaChatMessage = { role: 'assistant', content: text };
+      if (toolCalls.length > 0) {
+        assistantMsg.tool_calls = toolCalls;
+      }
+      result.push(assistantMsg);
+    } else if (msg.role === 'user') {
+      let text = '';
+
+      for (const c of msg.content) {
+        if (c.type === 'tool_result') {
+          result.push({ role: 'tool', content: c.content });
+        } else if (c.type === 'text') {
+          text += c.text;
+        }
+      }
+
+      if (text) {
+        result.push({ role: 'user', content: text });
+      }
+    } else {
+      // system messages with structured content — extract text only
+      let text = '';
+      for (const c of msg.content) {
+        if (c.type === 'text') {
+          text += c.text;
+        }
+      }
+      if (text) {
+        result.push({ role: 'system', content: text });
+      }
+    }
+  }
+
+  return result;
+}
+
 export class OllamaProvider implements LLMProvider {
   readonly name = 'ollama';
   private _models: string[] = [];
@@ -67,30 +140,9 @@ export class OllamaProvider implements LLMProvider {
     this.baseUrl = config.baseUrl ?? env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
   }
 
+  /* Delegate to the exported standalone function */
   private toOllamaMessages(messages: Message[], systemPrompt?: string): OllamaChatMessage[] {
-    const result: OllamaChatMessage[] = [];
-
-    if (systemPrompt) {
-      result.push({ role: 'system', content: systemPrompt });
-    }
-
-    for (const msg of messages) {
-      if (typeof msg.content === 'string') {
-        result.push({ role: msg.role, content: msg.content });
-      } else {
-        let text = '';
-        for (const c of msg.content) {
-          if (c.type === 'text') {
-            text += c.text;
-          }
-        }
-        if (text) {
-          result.push({ role: msg.role, content: text });
-        }
-      }
-    }
-
-    return result;
+    return toOllamaMessages(messages, systemPrompt);
   }
 
   async chat(params: ChatParams): Promise<ChatResult> {

@@ -43,11 +43,13 @@ export class TokenTracker {
       // Note: thinkingTokens is a subset of outputTokens (already included), not additive.
       const recordCost =
         (r.inputTokens * cost.input) / 1_000_000 +
-        (r.outputTokens * cost.output) / 1_000_000;
+        (r.outputTokens * cost.output) / 1_000_000 +
+        ((r.cacheReadTokens ?? 0) * cost.cacheRead) / 1_000_000 +
+        ((r.cacheWriteTokens ?? 0) * cost.cacheWrite) / 1_000_000;
 
       totalInput += r.inputTokens;
       totalOutput += r.outputTokens;
-      totalThinking += r.thinkingTokens;
+      totalThinking += r.thinkingTokens ?? 0;
       totalCost += recordCost;
 
       // Aggregate by provider
@@ -56,7 +58,7 @@ export class TokenTracker {
       }
       byProvider[r.provider].input += r.inputTokens;
       byProvider[r.provider].output += r.outputTokens;
-      byProvider[r.provider].thinking += r.thinkingTokens;
+      byProvider[r.provider].thinking += r.thinkingTokens ?? 0;
       byProvider[r.provider].cost += recordCost;
 
       // Aggregate by model
@@ -65,7 +67,7 @@ export class TokenTracker {
       }
       byModel[r.model].input += r.inputTokens;
       byModel[r.model].output += r.outputTokens;
-      byModel[r.model].thinking += r.thinkingTokens;
+      byModel[r.model].thinking += r.thinkingTokens ?? 0;
       byModel[r.model].cost += recordCost;
     }
 

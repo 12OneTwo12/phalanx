@@ -120,6 +120,35 @@ describe('TokenTracker', () => {
     expect(tracker.count).toBe(0);
   });
 
+  it('includes cache token costs in estimation', () => {
+    // claude-sonnet-4-5: cacheRead $0.3/1M, cacheWrite $3.75/1M
+    tracker.record(makeRecord({
+      model: 'claude-sonnet-4-5',
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 1_000_000,
+      cacheWriteTokens: 1_000_000,
+    }));
+
+    const summary = tracker.getSummary();
+    // (1M * 0.3) / 1M + (1M * 3.75) / 1M = 0.3 + 3.75 = 4.05
+    expect(summary.estimatedCost).toBeCloseTo(4.05, 4);
+  });
+
+  it('handles optional thinkingTokens gracefully', () => {
+    tracker.record({
+      provider: 'openai',
+      model: 'gpt-4o',
+      inputTokens: 100,
+      outputTokens: 50,
+      timestamp: new Date(),
+    });
+
+    const summary = tracker.getSummary();
+    expect(summary.totalThinkingTokens).toBe(0);
+    expect(summary.byProvider['openai'].thinking).toBe(0);
+  });
+
   it('getTodaySummary filters to today', () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
