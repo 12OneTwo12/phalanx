@@ -51,11 +51,14 @@ export const ollamaProviderFactory: ProviderFactory = {
 
 export class OllamaProvider implements LLMProvider {
   readonly name = 'ollama';
-  readonly models: string[] = [];
+  private _models: string[] = [];
+
+  get models(): string[] {
+    return this._models;
+  }
 
   private baseUrl: string;
   private config: ProviderConfig;
-  private discoveredModels: string[] | null = null;
 
   constructor(config: ProviderConfig = {}) {
     this.config = config;
@@ -129,8 +132,8 @@ export class OllamaProvider implements LLMProvider {
       },
     });
 
-    const toolCalls: ToolCall[] = (response.message.tool_calls ?? []).map((tc, i) => ({
-      id: `ollama_tool_${i}`,
+    const toolCalls: ToolCall[] = (response.message.tool_calls ?? []).map((tc) => ({
+      id: crypto.randomUUID(),
       name: tc.function.name,
       input: tc.function.arguments,
     }));
@@ -160,13 +163,12 @@ export class OllamaProvider implements LLMProvider {
 
   /** Discover available models from the local Ollama server */
   async discoverModels(): Promise<string[]> {
-    if (this.discoveredModels) return this.discoveredModels;
+    if (this._models.length > 0) return this._models;
 
     try {
       const data = await this.request<OllamaListResponse>('/api/tags', undefined, 'GET');
-      this.discoveredModels = data.models.map((m) => m.name);
-      (this as { models: string[] }).models = this.discoveredModels;
-      return this.discoveredModels;
+      this._models = data.models.map((m) => m.name);
+      return this._models;
     } catch {
       return [];
     }

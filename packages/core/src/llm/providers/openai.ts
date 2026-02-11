@@ -219,11 +219,15 @@ export class OpenAIProvider implements LLMProvider {
     const response = await this.client.chat.completions.create(requestParams);
     const choice = response.choices[0];
 
-    const toolCalls: ToolCall[] = (choice?.message?.tool_calls ?? []).map((tc) => ({
-      id: tc.id,
-      name: tc.function.name,
-      input: JSON.parse(tc.function.arguments || '{}'),
-    }));
+    const toolCalls: ToolCall[] = (choice?.message?.tool_calls ?? []).map((tc) => {
+      let input: Record<string, unknown>;
+      try {
+        input = JSON.parse(tc.function.arguments || '{}');
+      } catch {
+        input = { _raw: tc.function.arguments };
+      }
+      return { id: tc.id, name: tc.function.name, input };
+    });
 
     return {
       content: choice?.message?.content ?? '',

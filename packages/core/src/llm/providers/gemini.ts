@@ -174,7 +174,7 @@ export class GeminiProvider implements LLMProvider {
       }
       if (part.functionCall) {
         toolCalls.push({
-          id: `gemini_tool_${toolCalls.length}`,
+          id: crypto.randomUUID(),
           name: part.functionCall.name,
           input: part.functionCall.args,
         });
@@ -198,10 +198,13 @@ export class GeminiProvider implements LLMProvider {
   }
 
   private async request<T>(model: string, method: string, body: unknown): Promise<T> {
-    const url = `${this.baseUrl}/models/${model}:${method}?key=${this.apiKey}`;
+    const url = `${this.baseUrl}/models/${model}:${method}`;
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': this.apiKey,
+      },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(this.config.timeout ?? 120_000),
     });
