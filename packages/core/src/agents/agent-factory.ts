@@ -15,6 +15,8 @@ import { AgentExecutor } from './agent-executor.js';
 export interface CreateAgentOptions {
   /** Agent role determines which soul templates to load */
   role: AgentRole;
+  /** Working directory for tool execution (absolute path) */
+  workingDirectory: string;
   /** Optional agent ID override (auto-generated if not provided) */
   id?: string;
   /** Model resolution context for the 5-step pipeline */
@@ -86,6 +88,7 @@ export class AgentFactory {
       soul,
       model: resolvedModel,
       tools: options.toolPermissions ?? {},
+      workingDirectory: options.workingDirectory,
       maxIterations: options.maxIterations ?? 25,
       thinkingLevel: options.thinkingLevel,
       temperature: options.temperature,

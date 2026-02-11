@@ -38,6 +38,8 @@ export interface AgentConfig {
   soul: AgentSoulConfig;
   model: ResolvedModel;
   tools: AgentToolPermissions;
+  /** Working directory for tool execution (absolute path) */
+  workingDirectory: string;
   maxIterations: number;
   temperature?: number;
   thinkingLevel?: ThinkingLevel;

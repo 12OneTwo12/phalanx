@@ -47,6 +47,7 @@ function makeConfig(overrides: Partial<AgentConfig> = {}): AgentConfig {
       resolvedFrom: 'system',
     },
     tools: {},
+    workingDirectory: '/tmp/test-workdir',
     maxIterations: 25,
     ...overrides,
   };

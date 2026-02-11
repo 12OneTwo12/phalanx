@@ -270,8 +270,8 @@ export class AgentExecutor {
     // Execute the tool
     const context: ToolExecutionContext = {
       agentId: config.id,
-      workingDirectory: '.', // Will be overridden by caller via config
-      timeout: config.maxIterations > 0 ? 120_000 : undefined,
+      workingDirectory: config.workingDirectory,
+      timeout: 120_000,
     };
 
     try {
