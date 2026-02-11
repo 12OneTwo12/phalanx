@@ -18,6 +18,8 @@ export function KanbanBoard({ tickets }: KanbanBoardProps) {
         return (
           <div
             key={col.id}
+            role="region"
+            aria-label={`${col.label} column, ${items.length} tickets`}
             className={`w-64 shrink-0 rounded-lg border-t-2 ${col.color} bg-gray-900 p-3`}
           >
             <div className="mb-3 flex items-center justify-between">

@@ -66,6 +66,7 @@ export function KanbanCard({ ticket }: KanbanCardProps) {
             <button
               onClick={handleApprove}
               disabled={loading}
+              aria-label={`Approve ticket: ${ticket.title}`}
               className="rounded bg-green-600/20 px-2 py-1 text-xs text-green-400 hover:bg-green-600/30 disabled:opacity-50"
             >
               ✓ Approve
@@ -73,6 +74,7 @@ export function KanbanCard({ ticket }: KanbanCardProps) {
             <button
               onClick={handleReject}
               disabled={loading}
+              aria-label={`Reject ticket: ${ticket.title}`}
               className="rounded bg-red-600/20 px-2 py-1 text-xs text-red-400 hover:bg-red-600/30 disabled:opacity-50"
             >
               ✗ Reject

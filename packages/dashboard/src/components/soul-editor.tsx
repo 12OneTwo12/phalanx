@@ -85,6 +85,7 @@ export function SoulEditor({ agentId }: SoulEditorProps) {
         <textarea
           value={currentContent}
           onChange={(e) => setEditValue(e.target.value)}
+          aria-label={`Edit ${TAB_LABELS[activeTab]} content`}
           className="h-80 w-full resize-y rounded-md border border-gray-700 bg-gray-800 p-3 font-mono text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
           placeholder={`Edit ${TAB_LABELS[activeTab]}...`}
         />

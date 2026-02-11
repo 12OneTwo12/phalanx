@@ -41,12 +41,14 @@ export default function HeartbeatPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleProposalAction(proposal.id, 'approved')}
+                        aria-label={`Approve proposal: ${proposal.title}`}
                         className="rounded bg-green-600/20 px-3 py-1 text-sm text-green-400 hover:bg-green-600/30"
                       >
                         Approve
                       </button>
                       <button
                         onClick={() => handleProposalAction(proposal.id, 'rejected')}
+                        aria-label={`Reject proposal: ${proposal.title}`}
                         className="rounded bg-red-600/20 px-3 py-1 text-sm text-red-400 hover:bg-red-600/30"
                       >
                         Reject

@@ -28,7 +28,7 @@ export function Sidebar() {
       <div className="p-4">
         <h1 className="text-xl font-bold tracking-tight">⚔️ Phalanx</h1>
       </div>
-      <nav className="flex-1 space-y-1 px-2">
+      <nav aria-label="Main navigation" className="flex-1 space-y-1 px-2">
         {NAV_ITEMS.map((item) => {
           const active =
             item.href === '/'
