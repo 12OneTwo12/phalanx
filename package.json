@@ -1,0 +1,31 @@
+{
+  "name": "phalanx",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Goal-driven autonomous AI agent team orchestrator",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:watch": "pnpm -r test:watch",
+    "lint": "eslint packages/*/src/**/*.ts",
+    "lint:fix": "eslint packages/*/src/**/*.ts --fix",
+    "format": "prettier --write \"packages/*/src/**/*.ts\"",
+    "format:check": "prettier --check \"packages/*/src/**/*.ts\"",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "pnpm -r clean"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "eslint": "^9.19.0",
+    "prettier": "^3.4.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.22.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
