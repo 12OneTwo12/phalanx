@@ -1,11 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  parseModelId,
-  formatModelId,
-  ProviderRegistry,
-  ProviderHealthTracker,
-  ModelResolver,
-} from '../../src/llm/model-resolver.js';
+import { parseModelId, formatModelId } from '../../src/llm/model-id.js';
+import { ProviderRegistry } from '../../src/llm/provider-registry.js';
+import { ProviderHealthTracker } from '../../src/llm/health-tracker.js';
+import { ModelResolver } from '../../src/llm/model-resolver.js';
 import type { LLMProvider, ModelResolutionContext } from '../../src/llm/types.js';
 
 // ---------------------------------------------------------------------------
