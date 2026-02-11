@@ -28,6 +28,11 @@ export const logger = {
     console.log(chalk.dim(message));
   },
 
+  /** List item display */
+  item(message: string): void {
+    console.log(`  ${message}`);
+  },
+
   /** Key-value pair display */
   kv(key: string, value: string | number | boolean): void {
     console.log(`  ${chalk.gray(key + ':')} ${value}`);

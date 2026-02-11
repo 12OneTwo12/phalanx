@@ -11,8 +11,8 @@ import type { Goal } from '../db/schema.js';
 export class GoalManager extends EventEmitter {
   constructor(
     private readonly goalRepo: GoalRepository,
-    private readonly epicRepo: EpicRepository,
-    private readonly ticketRepo: TicketRepository,
+    private readonly epicRepo?: EpicRepository,
+    private readonly ticketRepo?: TicketRepository,
   ) {
     super();
   }
@@ -53,6 +53,9 @@ export class GoalManager extends EventEmitter {
    * fetch all tickets for a goal's epics in one round-trip.
    */
   calculateProgress(goalId: string): number {
+    if (!this.epicRepo || !this.ticketRepo) {
+      throw new Error('epicRepo and ticketRepo are required for progress calculation');
+    }
     const epics = this.epicRepo.findByGoalId(goalId);
     if (epics.length === 0) return 0;
 

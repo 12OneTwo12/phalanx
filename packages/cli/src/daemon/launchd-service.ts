@@ -40,6 +40,35 @@ function buildPlist(opts: DaemonInstallOpts): string {
 </plist>`;
 }
 
+/**
+ * Parse `ps` elapsed time format (e.g. "01:23", "2-03:45:12") into
+ * a human-readable string like "2d 3h 45m".
+ */
+function parseEtime(etime: string): string {
+  // Format: [[DD-]HH:]MM:SS
+  const parts = etime.split('-');
+  let days = 0;
+  let timePart = etime;
+  if (parts.length === 2) {
+    days = parseInt(parts[0], 10);
+    timePart = parts[1];
+  }
+  const segments = timePart.split(':').map((s) => parseInt(s, 10));
+  let hours = 0;
+  let minutes = 0;
+  if (segments.length === 3) {
+    hours = segments[0];
+    minutes = segments[1];
+  } else if (segments.length === 2) {
+    minutes = segments[0];
+  }
+  const result: string[] = [];
+  if (days > 0) result.push(`${days}d`);
+  if (hours > 0) result.push(`${hours}h`);
+  if (minutes > 0 || result.length === 0) result.push(`${minutes}m`);
+  return result.join(' ');
+}
+
 export class LaunchdService implements DaemonService {
   async install(opts: DaemonInstallOpts): Promise<void> {
     const plistPath = getPlistPath();
@@ -96,10 +125,20 @@ export class LaunchdService implements DaemonService {
       }
     }
 
+    let uptime: string | null = null;
+    if (pid) {
+      try {
+        const etime = execSync(`ps -p ${pid} -o etime=`, { encoding: 'utf-8' }).trim();
+        uptime = parseEtime(etime);
+      } catch {
+        // Process may have just exited
+      }
+    }
+
     return {
       running,
       pid,
-      uptime: null,
+      uptime,
       platform: 'launchd',
     };
   }

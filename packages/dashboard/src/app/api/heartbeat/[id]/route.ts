@@ -13,11 +13,11 @@ interface RouteParams {
 /** Valid user response actions for heartbeat reports */
 type HeartbeatAction = 'acknowledge' | 'approve_all' | 'review' | 'later';
 
-const ACTION_TO_STATUS: Record<HeartbeatAction, 'acknowledged' | 'acted'> = {
+const ACTION_TO_STATUS: Record<HeartbeatAction, 'acknowledged' | 'acted' | 'pending'> = {
   acknowledge: 'acknowledged',
   approve_all: 'acted',
-  review: 'acted',
-  later: 'pending', // keeps status as pending
+  review: 'pending',
+  later: 'pending',
 };
 
 const VALID_ACTIONS: HeartbeatAction[] = ['acknowledge', 'approve_all', 'review', 'later'];
@@ -52,6 +52,16 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   // 'later' keeps status as pending — no update needed
   if (body.action === 'later') {
     return jsonResponse({ ...existing, action: 'later' });
+  }
+
+  // 'review' keeps status as pending but emits event for navigation
+  if (body.action === 'review') {
+    eventBus.emit('heartbeat:response', {
+      heartbeatId: id,
+      action: body.action,
+      status: 'pending',
+    });
+    return jsonResponse({ ...existing, action: 'review' });
   }
 
   const updated = repo.update(id, { status: newStatus });

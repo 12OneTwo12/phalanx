@@ -26,17 +26,7 @@ goalCommand
       const db = core.DatabaseManager.create({ path: config.dbPath });
       core.migrateUp(db);
       const goalRepo = new core.GoalRepository(db.orm);
-      const epicStub: Pick<InstanceType<typeof core.EpicRepository>, 'findByGoalId'> = {
-        findByGoalId: () => [],
-      };
-      const ticketStub: Pick<InstanceType<typeof core.TicketRepository>, 'findByEpicId'> = {
-        findByEpicId: () => [],
-      };
-      const manager = new core.GoalManager(
-        goalRepo,
-        epicStub as InstanceType<typeof core.EpicRepository>,
-        ticketStub as InstanceType<typeof core.TicketRepository>,
-      );
+      const manager = new core.GoalManager(goalRepo);
       const goal = manager.create(description);
       logger.success(`Goal created: ${goal.id}`);
       logger.kv('Description', description);
@@ -71,7 +61,7 @@ goalCommand
         logger.heading('Goals');
         for (const goal of goals) {
           const statusIcon = goal.status === 'active' ? '●' : goal.status === 'completed' ? '✔' : '◯';
-          console.log(`  ${statusIcon} [${goal.id.slice(0, 8)}] ${goal.description} (${goal.status}, ${goal.progress}%)`);
+          logger.item(`${statusIcon} [${goal.id.slice(0, 8)}] ${goal.description} (${goal.status}, ${goal.progress}%)`);
         }
       }
       db.close();
