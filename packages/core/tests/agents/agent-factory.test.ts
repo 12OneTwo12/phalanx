@@ -113,7 +113,7 @@ describe('AgentFactory', () => {
         workingDirectory: '/project',
       });
 
-      expect(config.id).toMatch(/^frontend-\d+$/);
+      expect(config.id).toMatch(/^frontend-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     });
 
     it('uses custom id when provided', async () => {

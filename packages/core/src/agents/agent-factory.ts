@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { ModelResolutionContext, ThinkingLevel } from '../llm/types.js';
 import type { ModelResolver } from '../llm/model-resolver.js';
 import type { ProviderRegistry } from '../llm/provider-registry.js';
@@ -83,7 +84,7 @@ export class AgentFactory {
 
     // 4. Build config
     const config: AgentConfig = {
-      id: options.id ?? `${options.role}-${Date.now()}`,
+      id: options.id ?? `${options.role}-${randomUUID()}`,
       role: options.role,
       soul,
       model: resolvedModel,
