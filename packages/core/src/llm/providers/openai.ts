@@ -163,7 +163,7 @@ export class OpenAIProvider implements LLMProvider {
 
     // Reasoning models use reasoning_effort instead of temperature/max_tokens
     if (isReasoning && thinkingLevel !== 'off') {
-      (requestParams as Record<string, unknown>).reasoning_effort = thinkingLevel;
+      (requestParams as unknown as Record<string, unknown>).reasoning_effort = thinkingLevel;
     } else {
       requestParams.max_tokens = params.maxTokens ?? 4096;
       if (params.temperature !== undefined) {
@@ -207,7 +207,7 @@ export class OpenAIProvider implements LLMProvider {
     }
 
     if (isReasoning && thinkingLevel !== 'off') {
-      (requestParams as Record<string, unknown>).reasoning_effort = thinkingLevel;
+      (requestParams as unknown as Record<string, unknown>).reasoning_effort = thinkingLevel;
     } else {
       requestParams.max_tokens = params.maxTokens ?? 4096;
       if (params.temperature !== undefined) {

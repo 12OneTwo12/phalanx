@@ -5,7 +5,6 @@ import type {
   ChatWithToolsParams,
   ToolCallResult,
   ToolCall,
-  TokenUsage,
   ProviderConfig,
   Message,
   MessageContent,
@@ -171,7 +170,7 @@ export class OllamaProvider implements LLMProvider {
     const response = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      ...(body && { body: JSON.stringify(body) }),
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(this.config.timeout ?? 300_000),
     });
 

@@ -1,4 +1,4 @@
-import type { TokenUsageRecord, TokenUsageSummary, ModelConfig } from './types.js';
+import type { TokenUsageRecord, TokenUsageSummary } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Known model costs (per 1k tokens)

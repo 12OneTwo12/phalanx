@@ -71,8 +71,8 @@ function extractUsage(response: Anthropic.Message): TokenUsage {
   return {
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
-    cacheReadTokens: (response.usage as Record<string, number>).cache_read_input_tokens,
-    cacheWriteTokens: (response.usage as Record<string, number>).cache_creation_input_tokens,
+    cacheReadTokens: (response.usage as unknown as Record<string, number>).cache_read_input_tokens,
+    cacheWriteTokens: (response.usage as unknown as Record<string, number>).cache_creation_input_tokens,
   };
 }
 
@@ -118,7 +118,7 @@ export class AnthropicProvider implements LLMProvider {
 
     // Add thinking config if enabled
     if (thinkingConfig.type === 'enabled' && thinkingConfig.budgetTokens) {
-      (requestParams as Record<string, unknown>).thinking = {
+      (requestParams as unknown as Record<string, unknown>).thinking = {
         type: 'enabled',
         budget_tokens: thinkingConfig.budgetTokens,
       };
@@ -128,7 +128,7 @@ export class AnthropicProvider implements LLMProvider {
         thinkingConfig.budgetTokens + 4096,
       );
       // Temperature must be 1 when thinking is enabled
-      delete (requestParams as Record<string, unknown>).temperature;
+      delete (requestParams as unknown as Record<string, unknown>).temperature;
     }
 
     const response = await this.client.messages.create(requestParams);
@@ -140,7 +140,7 @@ export class AnthropicProvider implements LLMProvider {
       if (block.type === 'text') {
         textContent += block.text;
       } else if (block.type === 'thinking') {
-        thinkingContent += (block as Record<string, string>).thinking;
+        thinkingContent += (block as unknown as Record<string, string>).thinking;
       }
     }
 
@@ -172,14 +172,14 @@ export class AnthropicProvider implements LLMProvider {
         requestParams.tool_choice = { type: 'auto' };
       } else if (params.toolChoice === 'none') {
         // Anthropic doesn't support 'none' — omit tools instead
-        delete (requestParams as Record<string, unknown>).tools;
+        delete (requestParams as unknown as Record<string, unknown>).tools;
       } else {
         requestParams.tool_choice = { type: 'tool', name: params.toolChoice.name };
       }
     }
 
     if (thinkingConfig.type === 'enabled' && thinkingConfig.budgetTokens) {
-      (requestParams as Record<string, unknown>).thinking = {
+      (requestParams as unknown as Record<string, unknown>).thinking = {
         type: 'enabled',
         budget_tokens: thinkingConfig.budgetTokens,
       };
@@ -187,7 +187,7 @@ export class AnthropicProvider implements LLMProvider {
         requestParams.max_tokens,
         thinkingConfig.budgetTokens + 4096,
       );
-      delete (requestParams as Record<string, unknown>).temperature;
+      delete (requestParams as unknown as Record<string, unknown>).temperature;
     }
 
     const response = await this.client.messages.create(requestParams);
@@ -206,7 +206,7 @@ export class AnthropicProvider implements LLMProvider {
           input: block.input as Record<string, unknown>,
         });
       } else if (block.type === 'thinking') {
-        thinkingContent += (block as Record<string, string>).thinking;
+        thinkingContent += (block as unknown as Record<string, string>).thinking;
       }
     }
 
