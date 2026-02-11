@@ -77,7 +77,7 @@ describe('AgentTicketExecutor', () => {
   it('should execute a ticket successfully', async () => {
     const result = await ticketExecutor.execute(makeTicket());
     expect(result.success).toBe(true);
-    expect(branchManager.createTicketBranch).toHaveBeenCalledWith('t1', 'add-login');
+    expect(branchManager.createTicketBranch).toHaveBeenCalledWith('t1', 'Add Login');
     expect(executor.run).toHaveBeenCalled();
   });
 

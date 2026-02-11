@@ -128,9 +128,18 @@ export class TicketPipeline extends EventEmitter {
           // Continue with empty data
         }
 
+        // Reconstruct branch name deterministically from branchManager
+        // (ticket.branch may not be updated after branch creation in executor)
+        let ticketBranch: string;
+        try {
+          ticketBranch = await this.branchManager.getCurrentBranch();
+        } catch {
+          ticketBranch = ticket.branch ?? '';
+        }
+
         const prDecision = this.prController.decide({
           ticketId: ticket.id,
-          branch: ticket.branch ?? '',
+          branch: ticketBranch,
           baseBranch: this.config.baseBranch,
           changedFiles,
           diff,
@@ -146,7 +155,7 @@ export class TicketPipeline extends EventEmitter {
 
         const prResult = await this.prCreator.create({
           ticket: ticketInfo,
-          branch: ticket.branch ?? '',
+          branch: ticketBranch,
           baseBranch: this.config.baseBranch,
           verificationResult,
           decision: prDecision.decision,

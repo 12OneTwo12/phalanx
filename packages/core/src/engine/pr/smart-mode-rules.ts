@@ -2,7 +2,8 @@
  * Smart mode rules — Strategy pattern for auto-merge decision rules.
  * Open/Closed: new rules can be added without modifying SmartModeEngine.
  */
-import type { PRContext } from './types.js';
+import type { PRContext, AutoMergeRuleConfig } from './types.js';
+import { DEFAULT_AUTO_MERGE_RULE_CONFIG } from './types.js';
 
 export interface RuleEvaluation {
   allowed: boolean;
@@ -147,17 +148,18 @@ export class SmartModeEngine {
 
 /**
  * Create a SmartModeEngine with default rules.
+ * Uses DEFAULT_AUTO_MERGE_RULE_CONFIG as baseline, overridden by provided config.
  */
-export function createDefaultSmartModeEngine(config?: {
-  maxFiles?: number;
-  forbiddenPaths?: string[];
-  forbiddenKeywords?: string[];
-}): SmartModeEngine {
+export function createDefaultSmartModeEngine(
+  config?: Partial<AutoMergeRuleConfig>,
+): SmartModeEngine {
+  const merged = { ...DEFAULT_AUTO_MERGE_RULE_CONFIG, ...config };
+
   return new SmartModeEngine([
-    new MaxFilesChangedRule(config?.maxFiles),
-    new ForbiddenPathsRule(config?.forbiddenPaths),
+    new MaxFilesChangedRule(merged.maxFilesChanged),
+    new ForbiddenPathsRule(merged.forbiddenPaths),
     new RequireTestsPassRule(),
-    new ForbiddenKeywordsRule(config?.forbiddenKeywords),
+    new ForbiddenKeywordsRule(merged.forbiddenKeywords),
     new NoNewDependenciesRule(),
   ]);
 }

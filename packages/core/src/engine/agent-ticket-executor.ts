@@ -98,12 +98,12 @@ export class AgentTicketExecutor implements TicketExecutor {
    * 4. Converting result to TicketExecutor format
    */
   async execute(ticket: Ticket): Promise<{ success: boolean; error?: string }> {
-    const slug = this.slugify(ticket.title);
     let branchName: string | undefined;
 
     try {
       // Create isolated branch for this ticket
-      branchName = await this.branchManager.createTicketBranch(ticket.id, slug);
+      // Delegate slug normalization to BranchManager (single source of truth)
+      branchName = await this.branchManager.createTicketBranch(ticket.id, ticket.title);
 
       // Build agent config
       const resolved = this.configResolver.resolve(ticket, this.config);
@@ -177,11 +177,4 @@ export class AgentTicketExecutor implements TicketExecutor {
     return sections.join('\n\n');
   }
 
-  private slugify(title: string): string {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 50) || 'task';
-  }
 }
