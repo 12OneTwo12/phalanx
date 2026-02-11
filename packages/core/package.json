@@ -13,6 +13,14 @@
     "./llm": {
       "import": "./dist/llm/index.js",
       "types": "./dist/llm/index.d.ts"
+    },
+    "./tools": {
+      "import": "./dist/tools/index.js",
+      "types": "./dist/tools/index.d.ts"
+    },
+    "./agents": {
+      "import": "./dist/agents/index.js",
+      "types": "./dist/agents/index.d.ts"
     }
   },
   "scripts": {
