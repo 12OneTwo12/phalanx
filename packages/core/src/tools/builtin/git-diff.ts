@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import type { Tool, ToolExecutionContext, ToolResult } from '../types.js';
+import { resolveSafePath } from './path-utils.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -34,6 +35,10 @@ export const gitDiffTool: Tool<typeof schema> = {
         args.push('--staged');
       }
       if (params.path) {
+        const safe = await resolveSafePath(params.path, context.workingDirectory);
+        if (!safe) {
+          return { success: false, content: '', error: 'Path traversal denied' };
+        }
         args.push('--', params.path);
       }
 

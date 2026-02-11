@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import type { Tool, ToolExecutionContext, ToolResult } from '../types.js';
+import { resolveSafePath } from './path-utils.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -37,6 +38,10 @@ export const gitCommitTool: Tool<typeof schema> = {
       // Stage files if provided
       if (params.files && params.files.length > 0) {
         for (const file of params.files) {
+          const safe = await resolveSafePath(file, context.workingDirectory);
+          if (!safe) {
+            return { success: false, content: '', error: `Path traversal denied: ${file}` };
+          }
           await execFileAsync('git', ['add', file], {
             cwd: context.workingDirectory,
           });
