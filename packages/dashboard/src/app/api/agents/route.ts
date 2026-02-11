@@ -3,16 +3,24 @@ import { getAgentRepository } from '@/lib/db';
 import { jsonResponse, errorResponse, newId, parseBody } from '@/lib/api-utils';
 import type { NewAgent } from '@phalanx/core';
 
-/** GET /api/agents — list all agents with optional role/status filter */
+/** GET /api/agents — list all agents with optional role/status filters (combinable) */
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const role = searchParams.get('role') as NewAgent['role'] | null;
   const status = searchParams.get('status') as NewAgent['status'] | null;
   const repo = getAgentRepository();
 
-  if (role) return jsonResponse(repo.findByRole(role));
-  if (status) return jsonResponse(repo.findByStatus(status));
-  return jsonResponse(repo.findAll());
+  // Support combined filters by intersecting results in-memory
+  let results = repo.findAll();
+
+  if (role) {
+    results = results.filter((a) => a.role === role);
+  }
+  if (status) {
+    results = results.filter((a) => a.status === status);
+  }
+
+  return jsonResponse(results);
 }
 
 /** POST /api/agents — register a new agent */

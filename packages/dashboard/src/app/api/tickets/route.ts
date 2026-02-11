@@ -11,9 +11,17 @@ export async function GET(request: NextRequest) {
     const epicId = searchParams.get('epicId');
     const repo = getTicketRepository();
 
-    if (status) return jsonResponse(repo.findByStatus(status));
-    if (epicId) return jsonResponse(repo.findByEpicId(epicId));
-    return jsonResponse(repo.findAll());
+    // Support combined filters by intersecting results in-memory
+    let results = repo.findAll();
+
+    if (status) {
+      results = results.filter((t) => t.status === status);
+    }
+    if (epicId) {
+      results = results.filter((t) => t.epicId === epicId);
+    }
+
+    return jsonResponse(results);
   } catch {
     return errorResponse('Failed to fetch tickets', 500);
   }

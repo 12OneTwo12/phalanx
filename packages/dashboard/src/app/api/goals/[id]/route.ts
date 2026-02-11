@@ -22,14 +22,28 @@ export async function GET(_request: Request, { params }: RouteParams) {
   return jsonResponse({ ...goal, epics });
 }
 
+/** Allowed fields for goal PATCH updates */
+const GOAL_UPDATABLE_FIELDS = new Set(['description', 'status', 'progress', 'metadata']);
+
 /** PATCH /api/goals/:id — update a goal */
 export async function PATCH(request: Request, { params }: RouteParams) {
   const { id } = await params;
-  const body = await parseBody<{ description?: string; status?: string; progress?: number }>(request);
+  const body = await parseBody<Record<string, unknown>>(request);
   if (!body) return errorResponse('Invalid JSON body');
 
+  // Only allow known fields to prevent arbitrary field injection
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (GOAL_UPDATABLE_FIELDS.has(key)) {
+      sanitized[key] = value;
+    }
+  }
+  if (Object.keys(sanitized).length === 0) {
+    return errorResponse('No valid fields to update');
+  }
+
   const repo = getGoalRepository();
-  const updated = repo.update(id, body);
+  const updated = repo.update(id, sanitized);
   if (!updated) return errorResponse('Goal not found', 404);
 
   return jsonResponse(updated);

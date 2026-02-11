@@ -42,9 +42,12 @@ describe('GET /api/agents', () => {
   });
 
   it('should filter by role', async () => {
-    const agents = [{ id: 'a2', role: 'reviewer' }];
+    const agents = [
+      { id: 'a1', role: 'reviewer' },
+      { id: 'a2', role: 'coder' },
+    ];
     (getAgentRepository as ReturnType<typeof vi.fn>).mockReturnValue({
-      findByRole: () => agents,
+      findAll: () => agents,
     });
 
     const { NextRequest } = await import('next/server');
@@ -53,6 +56,7 @@ describe('GET /api/agents', () => {
     const body = await res.json();
 
     expect(body).toHaveLength(1);
+    expect(body[0].role).toBe('reviewer');
   });
 });
 

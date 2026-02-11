@@ -42,9 +42,12 @@ describe('GET /api/tickets', () => {
   });
 
   it('should filter by status', async () => {
-    const tickets = [{ id: 't2', status: 'done' }];
+    const tickets = [
+      { id: 't1', status: 'done', epicId: 'e1' },
+      { id: 't2', status: 'backlog', epicId: 'e1' },
+    ];
     (getTicketRepository as ReturnType<typeof vi.fn>).mockReturnValue({
-      findByStatus: () => tickets,
+      findAll: () => tickets,
     });
 
     const { NextRequest } = await import('next/server');
@@ -57,10 +60,12 @@ describe('GET /api/tickets', () => {
   });
 
   it('should filter by epicId', async () => {
-    const tickets = [{ id: 't3', epicId: 'e1' }];
+    const tickets = [
+      { id: 't1', epicId: 'e1', status: 'backlog' },
+      { id: 't2', epicId: 'e2', status: 'backlog' },
+    ];
     (getTicketRepository as ReturnType<typeof vi.fn>).mockReturnValue({
-      findByStatus: vi.fn(),
-      findByEpicId: () => tickets,
+      findAll: () => tickets,
     });
 
     const { NextRequest } = await import('next/server');
@@ -69,6 +74,7 @@ describe('GET /api/tickets', () => {
     const body = await res.json();
 
     expect(body).toHaveLength(1);
+    expect(body[0].epicId).toBe('e1');
   });
 });
 

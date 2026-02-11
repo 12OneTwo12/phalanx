@@ -42,9 +42,12 @@ describe('GET /api/activity', () => {
   });
 
   it('should filter by agentId', async () => {
-    const logs = [{ id: 'l2', agentId: 'a1' }];
+    const logs = [
+      { id: 'l1', agentId: 'a1', ticketId: null },
+      { id: 'l2', agentId: 'a2', ticketId: null },
+    ];
     (getActivityLogRepository as ReturnType<typeof vi.fn>).mockReturnValue({
-      findByAgentId: vi.fn(() => logs),
+      findAll: vi.fn(() => logs),
     });
 
     const { NextRequest } = await import('next/server');
@@ -53,13 +56,16 @@ describe('GET /api/activity', () => {
     const body = await res.json();
 
     expect(body).toHaveLength(1);
+    expect(body[0].agentId).toBe('a1');
   });
 
   it('should filter by ticketId', async () => {
-    const logs = [{ id: 'l3', ticketId: 't1' }];
+    const logs = [
+      { id: 'l1', agentId: null, ticketId: 't1' },
+      { id: 'l2', agentId: null, ticketId: 't2' },
+    ];
     (getActivityLogRepository as ReturnType<typeof vi.fn>).mockReturnValue({
-      findByAgentId: vi.fn(),
-      findByTicketId: vi.fn(() => logs),
+      findAll: vi.fn(() => logs),
     });
 
     const { NextRequest } = await import('next/server');
@@ -68,5 +74,6 @@ describe('GET /api/activity', () => {
     const body = await res.json();
 
     expect(body).toHaveLength(1);
+    expect(body[0].ticketId).toBe('t1');
   });
 });

@@ -42,7 +42,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (!updated) return errorResponse('Agent not found', 404);
     return jsonResponse(updated);
   } catch (err) {
-    return errorResponse('Failed to update agent', 500);
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error(`[PATCH /api/agents/${id}]`, message);
+    return errorResponse(`Failed to update agent: ${message}`, 500);
   }
 }
 
