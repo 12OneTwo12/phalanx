@@ -2,7 +2,7 @@
  * Codebase analyzer that scans project files to detect patterns and conventions.
  * Uses fs + ts-morph for AST analysis of naming patterns.
  */
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { DetectedPatterns, ConventionDraft } from './types.js';
 
@@ -16,9 +16,10 @@ export class ConventionAnalyzer {
    */
   async analyze(projectDir: string): Promise<ConventionDraft> {
     const patterns = await this.detectPatterns(projectDir);
+    const folderStructure = await this.detectFolderStructure(projectDir);
     return {
       conventions: this.generateConventionsMarkdown(patterns),
-      architecture: this.generateArchitectureMarkdown(patterns, projectDir),
+      architecture: this.generateArchitectureMarkdown(patterns, folderStructure),
       style: this.generateStyleMarkdown(patterns),
       detectedPatterns: patterns,
     };
@@ -28,19 +29,19 @@ export class ConventionAnalyzer {
    * Detect patterns from project configuration files and source code.
    */
   async detectPatterns(projectDir: string): Promise<DetectedPatterns> {
-    const pkg = this.readPackageJson(projectDir);
-    const tsConfig = this.readTsConfig(projectDir);
+    const pkg = await this.readPackageJson(projectDir);
+    const tsConfig = await this.readTsConfig(projectDir);
 
     return {
-      language: this.detectLanguage(pkg, projectDir),
+      language: await this.detectLanguage(pkg, projectDir),
       framework: this.detectFramework(pkg),
-      linter: this.detectLinter(pkg, projectDir),
-      formatter: this.detectFormatter(pkg, projectDir),
+      linter: await this.detectLinter(pkg, projectDir),
+      formatter: await this.detectFormatter(pkg, projectDir),
       testFramework: this.detectTestFramework(pkg),
-      namingConvention: this.detectNamingConvention(projectDir),
+      namingConvention: await this.detectNamingConvention(projectDir),
       commitStyle: this.detectCommitStyle(projectDir),
-      folderStructure: this.detectFolderStructure(projectDir),
-      packageManager: this.detectPackageManager(projectDir),
+      folderStructure: await this.detectFolderStructure(projectDir),
+      packageManager: await this.detectPackageManager(projectDir),
       buildTool: this.detectBuildTool(pkg),
       tsStrict: tsConfig?.compilerOptions?.strict ?? null,
     };
@@ -50,30 +51,69 @@ export class ConventionAnalyzer {
   // Detection helpers
   // ---------------------------------------------------------------------------
 
-  private readPackageJson(dir: string): Record<string, unknown> | null {
+  private async readPackageJson(dir: string): Promise<Record<string, unknown> | null> {
     const pkgPath = path.join(dir, 'package.json');
-    if (!fs.existsSync(pkgPath)) return null;
     try {
-      return JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+      await fs.access(pkgPath);
+      const content = await fs.readFile(pkgPath, 'utf-8');
+      return JSON.parse(content);
     } catch {
       return null;
     }
   }
 
-  private readTsConfig(dir: string): { compilerOptions?: { strict?: boolean } } | null {
+  private async readTsConfig(dir: string): Promise<{ compilerOptions?: { strict?: boolean } } | null> {
     const tsPath = path.join(dir, 'tsconfig.json');
-    if (!fs.existsSync(tsPath)) return null;
     try {
-      // Strip comments for JSON parse (basic)
-      const raw = fs.readFileSync(tsPath, 'utf-8').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-      return JSON.parse(raw);
+      await fs.access(tsPath);
+      const raw = await fs.readFile(tsPath, 'utf-8');
+      // Strip single-line and multi-line comments safely.
+      // Uses a state machine approach to avoid stripping inside string literals.
+      const stripped = this.stripJsonComments(raw);
+      return JSON.parse(stripped);
     } catch {
       return null;
     }
   }
 
-  private detectLanguage(pkg: Record<string, unknown> | null, dir: string): string {
-    if (fs.existsSync(path.join(dir, 'tsconfig.json'))) return 'TypeScript';
+  /**
+   * Strip JSON comments (single-line // and multi-line /* ... *​/) while
+   * preserving strings that may contain comment-like sequences.
+   */
+  private stripJsonComments(text: string): string {
+    let result = '';
+    let i = 0;
+    while (i < text.length) {
+      // String literal — copy verbatim
+      if (text[i] === '"') {
+        let j = i + 1;
+        while (j < text.length && text[j] !== '"') {
+          if (text[j] === '\\') j++; // skip escaped char
+          j++;
+        }
+        result += text.slice(i, j + 1);
+        i = j + 1;
+      // Single-line comment
+      } else if (text[i] === '/' && text[i + 1] === '/') {
+        while (i < text.length && text[i] !== '\n') i++;
+      // Multi-line comment
+      } else if (text[i] === '/' && text[i + 1] === '*') {
+        i += 2;
+        while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i++;
+        i += 2;
+      } else {
+        result += text[i];
+        i++;
+      }
+    }
+    return result;
+  }
+
+  private async detectLanguage(pkg: Record<string, unknown> | null, dir: string): Promise<string> {
+    try {
+      await fs.access(path.join(dir, 'tsconfig.json'));
+      return 'TypeScript';
+    } catch { /* not found */ }
     const deps = { ...(pkg?.dependencies as Record<string, string> ?? {}), ...(pkg?.devDependencies as Record<string, string> ?? {}) };
     if (deps['typescript']) return 'TypeScript';
     return 'JavaScript';
@@ -92,18 +132,24 @@ export class ConventionAnalyzer {
     return null;
   }
 
-  private detectLinter(pkg: Record<string, unknown> | null, dir: string): string | null {
+  private async detectLinter(pkg: Record<string, unknown> | null, dir: string): Promise<string | null> {
     if (!pkg) return null;
     const deps = { ...(pkg.dependencies as Record<string, string> ?? {}), ...(pkg.devDependencies as Record<string, string> ?? {}) };
-    if (deps['eslint'] || fs.existsSync(path.join(dir, '.eslintrc.json')) || fs.existsSync(path.join(dir, '.eslintrc.js')) || fs.existsSync(path.join(dir, 'eslint.config.js'))) return 'ESLint';
+    if (deps['eslint']) return 'ESLint';
+    for (const f of ['.eslintrc.json', '.eslintrc.js', 'eslint.config.js']) {
+      try { await fs.access(path.join(dir, f)); return 'ESLint'; } catch { /* not found */ }
+    }
     if (deps['biome'] || deps['@biomejs/biome']) return 'Biome';
     return null;
   }
 
-  private detectFormatter(pkg: Record<string, unknown> | null, dir: string): string | null {
+  private async detectFormatter(pkg: Record<string, unknown> | null, dir: string): Promise<string | null> {
     if (!pkg) return null;
     const deps = { ...(pkg.dependencies as Record<string, string> ?? {}), ...(pkg.devDependencies as Record<string, string> ?? {}) };
-    if (deps['prettier'] || fs.existsSync(path.join(dir, '.prettierrc')) || fs.existsSync(path.join(dir, '.prettierrc.json'))) return 'Prettier';
+    if (deps['prettier']) return 'Prettier';
+    for (const f of ['.prettierrc', '.prettierrc.json']) {
+      try { await fs.access(path.join(dir, f)); return 'Prettier'; } catch { /* not found */ }
+    }
     if (deps['biome'] || deps['@biomejs/biome']) return 'Biome';
     return null;
   }
@@ -118,12 +164,12 @@ export class ConventionAnalyzer {
     return null;
   }
 
-  private detectNamingConvention(dir: string): string {
+  private async detectNamingConvention(dir: string): Promise<string> {
     // Check file naming by scanning src/ directory
     const srcDir = path.join(dir, 'src');
-    if (!fs.existsSync(srcDir)) return 'unknown';
+    try { await fs.access(srcDir); } catch { return 'unknown'; }
 
-    const files = this.getFilesRecursive(srcDir, 2);
+    const files = await this.getFilesRecursive(srcDir, 2);
     const kebabCount = files.filter((f) => /^[a-z][a-z0-9-]+\.[a-z]+$/.test(path.basename(f))).length;
     const camelCount = files.filter((f) => /^[a-z][a-zA-Z0-9]+\.[a-z]+$/.test(path.basename(f))).length;
 
@@ -142,17 +188,25 @@ export class ConventionAnalyzer {
     return 'conventional';
   }
 
-  private detectFolderStructure(dir: string): string[] {
-    const entries = fs.readdirSync(dir, { withFileTypes: true })
-      .filter((e) => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules')
-      .map((e) => e.name);
-    return entries.slice(0, 20);
+  private async detectFolderStructure(dir: string): Promise<string[]> {
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      return entries
+        .filter((e) => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules')
+        .map((e) => e.name)
+        .slice(0, 20);
+    } catch {
+      return [];
+    }
   }
 
-  private detectPackageManager(dir: string): string {
-    if (fs.existsSync(path.join(dir, 'pnpm-lock.yaml')) || fs.existsSync(path.join(dir, 'pnpm-workspace.yaml'))) return 'pnpm';
-    if (fs.existsSync(path.join(dir, 'yarn.lock'))) return 'yarn';
-    if (fs.existsSync(path.join(dir, 'bun.lockb'))) return 'bun';
+  private async detectPackageManager(dir: string): Promise<string> {
+    for (const [file, manager] of [
+      ['pnpm-lock.yaml', 'pnpm'], ['pnpm-workspace.yaml', 'pnpm'],
+      ['yarn.lock', 'yarn'], ['bun.lockb', 'bun'],
+    ] as const) {
+      try { await fs.access(path.join(dir, file)); return manager; } catch { /* not found */ }
+    }
     return 'npm';
   }
 
@@ -168,16 +222,21 @@ export class ConventionAnalyzer {
     return null;
   }
 
-  private getFilesRecursive(dir: string, maxDepth: number, depth = 0): string[] {
-    if (depth >= maxDepth || !fs.existsSync(dir)) return [];
-    const results: string[] = [];
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isFile()) results.push(path.join(dir, entry.name));
-      else if (entry.isDirectory() && !entry.name.startsWith('.')) {
-        results.push(...this.getFilesRecursive(path.join(dir, entry.name), maxDepth, depth + 1));
+  private async getFilesRecursive(dir: string, maxDepth: number, depth = 0): Promise<string[]> {
+    if (depth >= maxDepth) return [];
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      const results: string[] = [];
+      for (const entry of entries) {
+        if (entry.isFile()) results.push(path.join(dir, entry.name));
+        else if (entry.isDirectory() && !entry.name.startsWith('.')) {
+          results.push(...await this.getFilesRecursive(path.join(dir, entry.name), maxDepth, depth + 1));
+        }
       }
+      return results;
+    } catch {
+      return [];
     }
-    return results;
   }
 
   // ---------------------------------------------------------------------------
@@ -215,8 +274,7 @@ export class ConventionAnalyzer {
     return lines.filter((l) => l !== null).join('\n');
   }
 
-  private generateArchitectureMarkdown(patterns: DetectedPatterns, dir: string): string {
-    const folders = this.detectFolderStructure(dir);
+  private generateArchitectureMarkdown(patterns: DetectedPatterns, folders: string[]): string {
     const lines = [
       '# Architecture',
       `> Auto-generated | Last updated: ${new Date().toISOString().split('T')[0]}`,

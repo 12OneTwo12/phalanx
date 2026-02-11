@@ -83,7 +83,14 @@ export class Orchestrator extends EventEmitter {
         } else {
           this.ticketRepo.update(ticket.id, { status: 'failed' });
         }
-      } catch { /* Best effort */ }
+      } catch (transitionErr) {
+        // Emit warning — failed to transition ticket to 'failed' state
+        this.emit('ticket:transition-error', {
+          ticketId: ticket.id,
+          error: String(transitionErr),
+          context: 'Failed to apply state machine transition during error recovery',
+        });
+      }
       this.emit('ticket:error', { ticketId: ticket.id, error: String(err) });
     } finally {
       this.activeTickets.delete(ticket.id);
