@@ -81,7 +81,10 @@ export class GeminiProvider implements LLMProvider {
 
     for (const msg of messages) {
       if (msg.role === 'system') {
-        sysInstruction = { parts: [{ text: msg.content as string }] };
+        const text = typeof msg.content === 'string'
+          ? msg.content
+          : msg.content.filter((c) => c.type === 'text').map((c) => c.text).join('');
+        sysInstruction = { parts: [{ text }] };
         continue;
       }
 

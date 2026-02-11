@@ -8,7 +8,6 @@ import type {
   ProviderConfig,
   ProviderFactory,
   Message,
-  MessageContent,
 } from '../types.js';
 
 // ---------------------------------------------------------------------------
@@ -76,12 +75,14 @@ export class OllamaProvider implements LLMProvider {
       if (typeof msg.content === 'string') {
         result.push({ role: msg.role, content: msg.content });
       } else {
-        const textParts = (msg.content as MessageContent[])
-          .filter((c) => c.type === 'text')
-          .map((c) => (c as { text: string }).text)
-          .join('');
-        if (textParts) {
-          result.push({ role: msg.role, content: textParts });
+        let text = '';
+        for (const c of msg.content) {
+          if (c.type === 'text') {
+            text += c.text;
+          }
+        }
+        if (text) {
+          result.push({ role: msg.role, content: text });
         }
       }
     }
