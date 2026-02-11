@@ -45,7 +45,7 @@ interface OllamaListResponse {
 export const ollamaProviderFactory: ProviderFactory = {
   name: 'ollama',
   shouldActivate: (config, env) => !!(config.baseUrl || env.OLLAMA_BASE_URL),
-  create: (config) => new OllamaProvider(config),
+  create: (config, env) => new OllamaProvider(config, env),
 };
 
 export class OllamaProvider implements LLMProvider {
@@ -59,9 +59,12 @@ export class OllamaProvider implements LLMProvider {
   private baseUrl: string;
   private config: ProviderConfig;
 
-  constructor(config: ProviderConfig = {}) {
+  constructor(
+    config: ProviderConfig = {},
+    env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+  ) {
     this.config = config;
-    this.baseUrl = config.baseUrl ?? process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
+    this.baseUrl = config.baseUrl ?? env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
   }
 
   private toOllamaMessages(messages: Message[], systemPrompt?: string): OllamaChatMessage[] {

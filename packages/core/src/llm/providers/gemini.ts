@@ -47,7 +47,7 @@ interface GeminiResponse {
 export const geminiProviderFactory: ProviderFactory = {
   name: 'gemini',
   shouldActivate: (config, env) => !!(config.apiKey ?? env.GEMINI_API_KEY),
-  create: (config) => new GeminiProvider(config),
+  create: (config, env) => new GeminiProvider(config, env),
 };
 
 export class GeminiProvider implements LLMProvider {
@@ -61,9 +61,12 @@ export class GeminiProvider implements LLMProvider {
   private baseUrl: string;
   private config: ProviderConfig;
 
-  constructor(config: ProviderConfig = {}) {
+  constructor(
+    config: ProviderConfig = {},
+    env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+  ) {
     this.config = config;
-    this.apiKey = config.apiKey ?? process.env.GEMINI_API_KEY ?? '';
+    this.apiKey = config.apiKey ?? env.GEMINI_API_KEY ?? '';
     this.baseUrl =
       config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta';
   }

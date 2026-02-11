@@ -158,8 +158,11 @@ export class OpenAIProvider implements LLMProvider {
   private client: OpenAI;
   private apiKey: string;
 
-  constructor(config: ProviderConfig = {}) {
-    this.apiKey = config.apiKey ?? process.env.OPENAI_API_KEY ?? '';
+  constructor(
+    config: ProviderConfig = {},
+    env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+  ) {
+    this.apiKey = config.apiKey ?? env.OPENAI_API_KEY ?? '';
     this.client = new OpenAI({
       apiKey: this.apiKey || undefined,
       baseURL: config.baseUrl,
@@ -249,7 +252,7 @@ export class OpenAIProvider implements LLMProvider {
 export const openaiProviderFactory: ProviderFactory = {
   name: 'openai',
   shouldActivate: (config, env) => !!(config.apiKey ?? env.OPENAI_API_KEY),
-  create: (config) => new OpenAIProvider(config),
+  create: (config, env) => new OpenAIProvider(config, env),
 };
 
 function mapStopReason(

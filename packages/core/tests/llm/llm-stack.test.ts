@@ -25,13 +25,8 @@ describe('createLLMStack', () => {
   });
 
   it('registers multiple providers when multiple keys exist', () => {
-    // Keys must be in both env (for shouldActivate) and providers config (for SDK construction)
+    // env is now passed to both shouldActivate and create — no duplication needed
     const { registry } = createLLMStack({
-      providers: {
-        anthropic: { apiKey: 'ak' },
-        openai: { apiKey: 'ok' },
-        gemini: { apiKey: 'gk' },
-      },
       env: {
         ANTHROPIC_API_KEY: 'ak',
         OPENAI_API_KEY: 'ok',
@@ -56,7 +51,7 @@ describe('createLLMStack', () => {
     const customFactory: ProviderFactory = {
       name: 'custom',
       shouldActivate: () => true,
-      create: () => customProvider,
+      create: (_config, _env) => customProvider,
     };
 
     const { registry } = createLLMStack({

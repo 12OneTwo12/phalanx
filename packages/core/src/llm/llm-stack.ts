@@ -49,7 +49,7 @@ export function createLLMStack(config: PhalanxLLMConfig = {}): {
   for (const factory of factories) {
     const providerConfig = config.providers?.[factory.name] ?? {};
     if (factory.shouldActivate(providerConfig, env)) {
-      registry.register(factory.create(providerConfig));
+      registry.register(factory.create(providerConfig, env));
     }
   }
 

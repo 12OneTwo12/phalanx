@@ -194,7 +194,11 @@ export interface LLMProvider {
   /** Send a chat message with tool definitions and get tool calls back */
   chatWithTools(params: ChatWithToolsParams): Promise<ToolCallResult>;
 
-  /** Check if the provider is available (API key set, service reachable) */
+  /**
+   * Check if the provider is available for use.
+   * For API-key-based providers: checks key existence (no network call).
+   * For local providers (e.g. Ollama): may perform a lightweight network ping.
+   */
   isAvailable(): Promise<boolean>;
 }
 
@@ -324,8 +328,8 @@ export interface ProviderFactory {
   readonly name: string;
   /** Determine if this provider should be activated given config and env */
   shouldActivate(config: ProviderConfig, env: Record<string, string | undefined>): boolean;
-  /** Create the provider instance */
-  create(config: ProviderConfig): LLMProvider;
+  /** Create the provider instance with config and injected env */
+  create(config: ProviderConfig, env: Record<string, string | undefined>): LLMProvider;
 }
 
 // ---------------------------------------------------------------------------

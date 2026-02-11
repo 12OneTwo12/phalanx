@@ -135,8 +135,11 @@ export class AnthropicProvider implements LLMProvider {
   private client: Anthropic;
   private apiKey: string;
 
-  constructor(config: ProviderConfig = {}) {
-    this.apiKey = config.apiKey ?? process.env.ANTHROPIC_API_KEY ?? '';
+  constructor(
+    config: ProviderConfig = {},
+    env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+  ) {
+    this.apiKey = config.apiKey ?? env.ANTHROPIC_API_KEY ?? '';
     this.client = new Anthropic({
       apiKey: this.apiKey || undefined,
       baseURL: config.baseUrl,
@@ -221,7 +224,7 @@ export class AnthropicProvider implements LLMProvider {
 export const anthropicProviderFactory: ProviderFactory = {
   name: 'anthropic',
   shouldActivate: (config, env) => !!(config.apiKey ?? env.ANTHROPIC_API_KEY),
-  create: (config) => new AnthropicProvider(config),
+  create: (config, env) => new AnthropicProvider(config, env),
 };
 
 function mapStopReason(reason: string | null): ChatResult['stopReason'] {
