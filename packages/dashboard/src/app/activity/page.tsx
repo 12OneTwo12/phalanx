@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { fetcher, apiUrl } from '@/lib/api-client';
 import type { ActivityLog } from '@phalanx/core';
@@ -13,12 +13,26 @@ const LEVEL_COLORS: Record<string, string> = {
   debug: 'text-gray-500',
 };
 
+/** Debounce a value by the given delay in ms */
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    timerRef.current = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timerRef.current);
+  }, [value, delayMs]);
+
+  return debounced;
+}
+
 export default function ActivityPage() {
   const [filter, setFilter] = useState<{ agentId?: string; ticketId?: string }>({});
+  const debouncedFilter = useDebouncedValue(filter, 300);
 
   const url = apiUrl('/activity', {
-    agentId: filter.agentId,
-    ticketId: filter.ticketId,
+    agentId: debouncedFilter.agentId,
+    ticketId: debouncedFilter.ticketId,
     limit: 200,
   });
 

@@ -31,7 +31,11 @@ export async function POST(request: Request) {
   const existing = repo.findByType(body.type as NewConvention['type']);
 
   if (existing) {
-    // Update existing with incremented version
+    // Update existing with incremented version.
+    // NOTE: This is not safe against concurrent updates (version race).
+    // For true optimistic locking, the client should send the expected version
+    // and the server should reject if it doesn't match (HTTP 409 Conflict).
+    // Acceptable for single-user dashboard MVP.
     const updated = repo.update(existing.id, {
       content: body.content,
       version: existing.version + 1,

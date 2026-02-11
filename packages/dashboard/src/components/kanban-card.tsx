@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { Ticket } from '@phalanx/core';
 import { apiPatch } from '@/lib/api-client';
 import { mutate } from 'swr';
@@ -15,15 +16,35 @@ interface KanbanCardProps {
   ticket: Ticket;
 }
 
+/** Kanban card component with approve/reject actions for pending tickets */
 export function KanbanCard({ ticket }: KanbanCardProps) {
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
   const handleApprove = async () => {
-    await apiPatch(`/tickets/${ticket.id}`, { status: 'backlog', approvedAt: new Date().toISOString() });
-    await mutate('/api/tickets');
+    setActionError(null);
+    setLoading(true);
+    try {
+      await apiPatch(`/tickets/${ticket.id}`, { status: 'backlog', approvedAt: new Date().toISOString() });
+      await mutate('/api/tickets');
+    } catch (err) {
+      setActionError('Failed to approve ticket');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReject = async () => {
-    await apiPatch(`/tickets/${ticket.id}`, { status: 'failed' });
-    await mutate('/api/tickets');
+    setActionError(null);
+    setLoading(true);
+    try {
+      await apiPatch(`/tickets/${ticket.id}`, { status: 'failed' });
+      await mutate('/api/tickets');
+    } catch (err) {
+      setActionError('Failed to reject ticket');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -40,19 +61,26 @@ export function KanbanCard({ ticket }: KanbanCardProps) {
 
       {/* Approval actions for pending tickets */}
       {ticket.status === 'pending_approval' && (
-        <div className="mt-2 flex gap-2">
-          <button
-            onClick={handleApprove}
-            className="rounded bg-green-600/20 px-2 py-1 text-xs text-green-400 hover:bg-green-600/30"
-          >
-            ✓ Approve
-          </button>
-          <button
-            onClick={handleReject}
-            className="rounded bg-red-600/20 px-2 py-1 text-xs text-red-400 hover:bg-red-600/30"
-          >
-            ✗ Reject
-          </button>
+        <div className="mt-2 flex flex-col gap-1">
+          <div className="flex gap-2">
+            <button
+              onClick={handleApprove}
+              disabled={loading}
+              className="rounded bg-green-600/20 px-2 py-1 text-xs text-green-400 hover:bg-green-600/30 disabled:opacity-50"
+            >
+              ✓ Approve
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={loading}
+              className="rounded bg-red-600/20 px-2 py-1 text-xs text-red-400 hover:bg-red-600/30 disabled:opacity-50"
+            >
+              ✗ Reject
+            </button>
+          </div>
+          {actionError && (
+            <p className="text-xs text-red-400">{actionError}</p>
+          )}
         </div>
       )}
     </div>
