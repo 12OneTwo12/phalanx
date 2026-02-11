@@ -109,10 +109,11 @@ describe('HeartbeatScheduler', () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(state.running).toBe(true);
 
-    // Manually try to arm/trigger again while running
+    // Manually try to trigger again while running by resetting timer
     // The running guard should prevent double execution
     state.timer = null;
-    scheduler.armTimer();
+    // Re-start the scheduler to arm a new timer
+    scheduler.start();
     await vi.advanceTimersByTimeAsync(100);
 
     // Only 1 call should have gone through

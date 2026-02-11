@@ -21,14 +21,20 @@ export interface HeartbeatServiceDeps extends ContextCheckerDeps {
   heartbeatLogRepo: HeartbeatLogRepository;
 }
 
+/** Typed event map for HeartbeatService. */
+export interface HeartbeatServiceEvents {
+  'heartbeat:report': [{ report: HeartbeatReport }];
+  'heartbeat:error': [{ error: unknown }];
+}
+
 /**
  * Top-level heartbeat service that orchestrates periodic system health checks.
  *
  * Events emitted:
- * - 'heartbeat:report' — { report: HeartbeatReport }
- * - 'heartbeat:error'  — { error: Error }
+ * - `heartbeat:report` — fired after each successful heartbeat tick with the generated report.
+ * - `heartbeat:error`  — fired when report persistence fails.
  */
-export class HeartbeatService extends EventEmitter {
+export class HeartbeatService extends EventEmitter<HeartbeatServiceEvents> {
   private readonly config: HeartbeatConfig;
   private readonly state: HeartbeatServiceState;
   private readonly contextChecker: ContextChecker;

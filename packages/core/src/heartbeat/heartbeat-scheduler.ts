@@ -60,7 +60,7 @@ export class HeartbeatScheduler {
    * Arm the next timer. Clamps delay to MAX_TIMER_DELAY_MS for drift correction.
    * If the target time hasn't been reached, re-arms with the remaining delay.
    */
-  armTimer(): void {
+  private armTimer(): void {
     // Clear any existing timer to prevent leaks
     if (this.state.timer !== null) {
       clearTimeout(this.state.timer);
