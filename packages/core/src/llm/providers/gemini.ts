@@ -46,7 +46,7 @@ interface GeminiResponse {
 
 export const geminiProviderFactory: ProviderFactory = {
   name: 'gemini',
-  shouldActivate: (config, env) => !!(config.apiKey || env.GEMINI_API_KEY),
+  shouldActivate: (config, env) => !!(config.apiKey ?? env.GEMINI_API_KEY),
   create: (config) => new GeminiProvider(config),
 };
 
@@ -63,7 +63,7 @@ export class GeminiProvider implements LLMProvider {
 
   constructor(config: ProviderConfig = {}) {
     this.config = config;
-    this.apiKey = config.apiKey || process.env.GEMINI_API_KEY || '';
+    this.apiKey = config.apiKey ?? process.env.GEMINI_API_KEY ?? '';
     this.baseUrl =
       config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta';
   }
@@ -205,7 +205,7 @@ export class GeminiProvider implements LLMProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    return !!(this.apiKey || process.env.GEMINI_API_KEY);
+    return !!this.apiKey;
   }
 
   private async request<T>(model: string, method: string, body: unknown): Promise<T> {

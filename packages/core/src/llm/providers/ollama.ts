@@ -45,7 +45,7 @@ interface OllamaListResponse {
 
 export const ollamaProviderFactory: ProviderFactory = {
   name: 'ollama',
-  shouldActivate: () => true, // Local provider, always registered
+  shouldActivate: (config, env) => !!(config.baseUrl || env.OLLAMA_BASE_URL),
   create: (config) => new OllamaProvider(config),
 };
 
@@ -62,7 +62,7 @@ export class OllamaProvider implements LLMProvider {
 
   constructor(config: ProviderConfig = {}) {
     this.config = config;
-    this.baseUrl = config.baseUrl || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    this.baseUrl = config.baseUrl ?? process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
   }
 
   private toOllamaMessages(messages: Message[], systemPrompt?: string): OllamaChatMessage[] {

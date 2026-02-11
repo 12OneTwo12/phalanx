@@ -21,8 +21,16 @@ describe('OllamaProvider', () => {
 });
 
 describe('ollamaProviderFactory', () => {
-  it('always activates (local provider)', () => {
-    expect(ollamaProviderFactory.shouldActivate({}, {})).toBe(true);
+  it('activates when baseUrl is in config', () => {
+    expect(ollamaProviderFactory.shouldActivate({ baseUrl: 'http://localhost:11434' }, {})).toBe(true);
+  });
+
+  it('activates when OLLAMA_BASE_URL is in env', () => {
+    expect(ollamaProviderFactory.shouldActivate({}, { OLLAMA_BASE_URL: 'http://localhost:11434' })).toBe(true);
+  });
+
+  it('does not activate without explicit config', () => {
+    expect(ollamaProviderFactory.shouldActivate({}, {})).toBe(false);
   });
 
   it('creates OllamaProvider instance', () => {

@@ -152,12 +152,12 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   private client: OpenAI;
-  private config: ProviderConfig;
+  private apiKey: string;
 
   constructor(config: ProviderConfig = {}) {
-    this.config = config;
+    this.apiKey = config.apiKey ?? process.env.OPENAI_API_KEY ?? '';
     this.client = new OpenAI({
-      apiKey: config.apiKey || process.env.OPENAI_API_KEY,
+      apiKey: this.apiKey || undefined,
       baseURL: config.baseUrl,
       maxRetries: config.maxRetries ?? 2,
       timeout: config.timeout ?? 120_000,
@@ -238,18 +238,13 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const key = this.config.apiKey || process.env.OPENAI_API_KEY;
-      return !!key;
-    } catch {
-      return false;
-    }
+    return !!this.apiKey;
   }
 }
 
 export const openaiProviderFactory: ProviderFactory = {
   name: 'openai',
-  shouldActivate: (config, env) => !!(config.apiKey || env.OPENAI_API_KEY),
+  shouldActivate: (config, env) => !!(config.apiKey ?? env.OPENAI_API_KEY),
   create: (config) => new OpenAIProvider(config),
 };
 
