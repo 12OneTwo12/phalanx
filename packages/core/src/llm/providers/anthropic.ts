@@ -11,7 +11,60 @@ import type {
   ProviderFactory,
   Message,
 } from '../types.js';
+import { MODEL_CATALOG } from '../model-catalog.js';
+import type { AnthropicThinkingConfig } from '../thinking-level.js';
 import { effectiveThinkingLevel, resolveAnthropicThinking } from '../thinking-level.js';
+
+// ---------------------------------------------------------------------------
+// Request/response helpers (extracted to reduce chat/chatWithTools duplication)
+// ---------------------------------------------------------------------------
+
+function applyThinkingConfig(
+  params: Anthropic.MessageCreateParams,
+  config: AnthropicThinkingConfig,
+): void {
+  if (config.type !== 'enabled' || !config.budgetTokens) return;
+  Object.assign(params, {
+    thinking: { type: 'enabled', budget_tokens: config.budgetTokens },
+  });
+  params.max_tokens = Math.max(params.max_tokens, config.budgetTokens + 4096);
+  delete params.temperature;
+}
+
+function extractUsage(response: Anthropic.Message): TokenUsage {
+  return {
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+    cacheReadTokens: response.usage.cache_read_input_tokens ?? undefined,
+    cacheWriteTokens: response.usage.cache_creation_input_tokens ?? undefined,
+  };
+}
+
+function extractContent(response: Anthropic.Message): {
+  text: string;
+  thinking: string;
+  toolCalls: ToolCall[];
+} {
+  let text = '';
+  let thinking = '';
+  const toolCalls: ToolCall[] = [];
+
+  for (const block of response.content) {
+    if (block.type === 'text') {
+      text += block.text;
+    } else if (block.type === 'tool_use') {
+      toolCalls.push({
+        id: block.id,
+        name: block.name,
+        input: block.input as Record<string, unknown>,
+      });
+    } else if (block.type === 'thinking') {
+      thinking += block.thinking;
+    }
+  }
+
+  return { text, thinking, toolCalls };
+}
 
 // ---------------------------------------------------------------------------
 // Anthropic message conversion
@@ -68,28 +121,16 @@ export function toAnthropicTools(
   }));
 }
 
-function extractUsage(response: Anthropic.Message): TokenUsage {
-  return {
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-    cacheReadTokens: (response.usage as unknown as Record<string, number>).cache_read_input_tokens,
-    cacheWriteTokens: (response.usage as unknown as Record<string, number>).cache_creation_input_tokens,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // AnthropicProvider
 // ---------------------------------------------------------------------------
 
-export const ANTHROPIC_MODELS = [
-  'claude-opus-4-6-20250414',
-  'claude-sonnet-4-5-20250929',
-  'claude-haiku-4-5-20251001',
-] as const;
-
 export class AnthropicProvider implements LLMProvider {
   readonly name = 'anthropic';
-  readonly models: string[] = [...ANTHROPIC_MODELS];
+
+  get models(): string[] {
+    return MODEL_CATALOG.filter((e) => e.provider === 'anthropic').map((e) => e.id);
+  }
 
   private client: Anthropic;
   private config: ProviderConfig;
@@ -105,8 +146,9 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   async chat(params: ChatParams): Promise<ChatResult> {
-    const thinkingLevel = effectiveThinkingLevel(params.thinkingLevel, params.model);
-    const thinkingConfig = resolveAnthropicThinking(thinkingLevel);
+    const thinkingConfig = resolveAnthropicThinking(
+      effectiveThinkingLevel(params.thinkingLevel, params.model),
+    );
 
     const requestParams: Anthropic.MessageCreateParams = {
       model: params.model,
@@ -117,46 +159,24 @@ export class AnthropicProvider implements LLMProvider {
       ...(params.stopSequences && { stop_sequences: params.stopSequences }),
     };
 
-    // Add thinking config if enabled
-    if (thinkingConfig.type === 'enabled' && thinkingConfig.budgetTokens) {
-      (requestParams as unknown as Record<string, unknown>).thinking = {
-        type: 'enabled',
-        budget_tokens: thinkingConfig.budgetTokens,
-      };
-      // Anthropic requires max_tokens to be larger than budget_tokens when thinking
-      requestParams.max_tokens = Math.max(
-        requestParams.max_tokens,
-        thinkingConfig.budgetTokens + 4096,
-      );
-      // Temperature must be 1 when thinking is enabled
-      delete (requestParams as unknown as Record<string, unknown>).temperature;
-    }
+    applyThinkingConfig(requestParams, thinkingConfig);
 
     const response = await this.client.messages.create(requestParams);
-
-    // Extract text and thinking content
-    let textContent = '';
-    let thinkingContent = '';
-    for (const block of response.content) {
-      if (block.type === 'text') {
-        textContent += block.text;
-      } else if (block.type === 'thinking') {
-        thinkingContent += (block as unknown as Record<string, string>).thinking;
-      }
-    }
+    const { text, thinking } = extractContent(response);
 
     return {
-      content: textContent,
+      content: text,
       stopReason: mapStopReason(response.stop_reason),
       usage: extractUsage(response),
       model: response.model,
-      thinkingContent: thinkingContent || undefined,
+      thinkingContent: thinking || undefined,
     };
   }
 
   async chatWithTools(params: ChatWithToolsParams): Promise<ToolCallResult> {
-    const thinkingLevel = effectiveThinkingLevel(params.thinkingLevel, params.model);
-    const thinkingConfig = resolveAnthropicThinking(thinkingLevel);
+    const thinkingConfig = resolveAnthropicThinking(
+      effectiveThinkingLevel(params.thinkingLevel, params.model),
+    );
 
     const requestParams: Anthropic.MessageCreateParams = {
       model: params.model,
@@ -172,52 +192,24 @@ export class AnthropicProvider implements LLMProvider {
       if (params.toolChoice === 'auto') {
         requestParams.tool_choice = { type: 'auto' };
       } else if (params.toolChoice === 'none') {
-        // Anthropic doesn't support 'none' — omit tools instead
-        delete (requestParams as unknown as Record<string, unknown>).tools;
+        delete (requestParams as { tools?: unknown }).tools;
       } else {
         requestParams.tool_choice = { type: 'tool', name: params.toolChoice.name };
       }
     }
 
-    if (thinkingConfig.type === 'enabled' && thinkingConfig.budgetTokens) {
-      (requestParams as unknown as Record<string, unknown>).thinking = {
-        type: 'enabled',
-        budget_tokens: thinkingConfig.budgetTokens,
-      };
-      requestParams.max_tokens = Math.max(
-        requestParams.max_tokens,
-        thinkingConfig.budgetTokens + 4096,
-      );
-      delete (requestParams as unknown as Record<string, unknown>).temperature;
-    }
+    applyThinkingConfig(requestParams, thinkingConfig);
 
     const response = await this.client.messages.create(requestParams);
-
-    let textContent = '';
-    let thinkingContent = '';
-    const toolCalls: ToolCall[] = [];
-
-    for (const block of response.content) {
-      if (block.type === 'text') {
-        textContent += block.text;
-      } else if (block.type === 'tool_use') {
-        toolCalls.push({
-          id: block.id,
-          name: block.name,
-          input: block.input as Record<string, unknown>,
-        });
-      } else if (block.type === 'thinking') {
-        thinkingContent += (block as unknown as Record<string, string>).thinking;
-      }
-    }
+    const { text, thinking, toolCalls } = extractContent(response);
 
     return {
-      content: textContent,
+      content: text,
       toolCalls,
       stopReason: mapStopReason(response.stop_reason),
       usage: extractUsage(response),
       model: response.model,
-      thinkingContent: thinkingContent || undefined,
+      thinkingContent: thinking || undefined,
     };
   }
 
@@ -237,9 +229,7 @@ export const anthropicProviderFactory: ProviderFactory = {
   create: (config) => new AnthropicProvider(config),
 };
 
-function mapStopReason(
-  reason: string | null,
-): ChatResult['stopReason'] {
+function mapStopReason(reason: string | null): ChatResult['stopReason'] {
   switch (reason) {
     case 'end_turn':
       return 'end_turn';

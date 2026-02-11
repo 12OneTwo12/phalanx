@@ -12,6 +12,7 @@ import type {
   Message,
   MessageContent,
 } from '../types.js';
+import { MODEL_CATALOG } from '../model-catalog.js';
 import { effectiveThinkingLevel } from '../thinking-level.js';
 
 // ---------------------------------------------------------------------------
@@ -68,7 +69,6 @@ export function toOpenAIMessages(
 
       result.push(assistantMsg);
     } else if (msg.role === 'user') {
-      // Check for tool results
       const toolResults = (msg.content as MessageContent[]).filter(
         (c) => c.type === 'tool_result',
       );
@@ -116,28 +116,40 @@ function extractUsage(usage?: OpenAI.CompletionUsage | null): TokenUsage {
 }
 
 // ---------------------------------------------------------------------------
-// OpenAI reasoning models detection
+// Reasoning model helpers
 // ---------------------------------------------------------------------------
 
 function isReasoningModel(model: string): boolean {
   return model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4');
 }
 
+function applyReasoningConfig(
+  params: OpenAI.ChatCompletionCreateParams,
+  model: string,
+  thinkingLevel: string,
+  maxTokens?: number,
+  temperature?: number,
+): void {
+  if (isReasoningModel(model) && thinkingLevel !== 'off') {
+    Object.assign(params, { reasoning_effort: thinkingLevel });
+  } else {
+    params.max_tokens = maxTokens ?? 4096;
+    if (temperature !== undefined) {
+      params.temperature = temperature;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // OpenAIProvider
 // ---------------------------------------------------------------------------
 
-export const OPENAI_MODELS = [
-  'gpt-4o',
-  'gpt-4o-mini',
-  'o3',
-  'o3-mini',
-  'o4-mini',
-] as const;
-
 export class OpenAIProvider implements LLMProvider {
   readonly name = 'openai';
-  readonly models: string[] = [...OPENAI_MODELS];
+
+  get models(): string[] {
+    return MODEL_CATALOG.filter((e) => e.provider === 'openai').map((e) => e.id);
+  }
 
   private client: OpenAI;
   private config: ProviderConfig;
@@ -154,7 +166,6 @@ export class OpenAIProvider implements LLMProvider {
 
   async chat(params: ChatParams): Promise<ChatResult> {
     const thinkingLevel = effectiveThinkingLevel(params.thinkingLevel, params.model);
-    const isReasoning = isReasoningModel(params.model);
 
     const requestParams: OpenAI.ChatCompletionCreateParams = {
       model: params.model,
@@ -162,17 +173,11 @@ export class OpenAIProvider implements LLMProvider {
       ...(params.stopSequences && { stop: params.stopSequences }),
     };
 
-    // Reasoning models use reasoning_effort instead of temperature/max_tokens
-    if (isReasoning && thinkingLevel !== 'off') {
-      (requestParams as unknown as Record<string, unknown>).reasoning_effort = thinkingLevel;
-    } else {
-      requestParams.max_tokens = params.maxTokens ?? 4096;
-      if (params.temperature !== undefined) {
-        requestParams.temperature = params.temperature;
-      }
-    }
+    applyReasoningConfig(requestParams, params.model, thinkingLevel, params.maxTokens, params.temperature);
 
-    const response = await this.client.chat.completions.create(requestParams);
+    const response = await this.client.chat.completions.create(
+      requestParams,
+    );
     const choice = response.choices[0];
 
     return {
@@ -185,7 +190,6 @@ export class OpenAIProvider implements LLMProvider {
 
   async chatWithTools(params: ChatWithToolsParams): Promise<ToolCallResult> {
     const thinkingLevel = effectiveThinkingLevel(params.thinkingLevel, params.model);
-    const isReasoning = isReasoningModel(params.model);
 
     const requestParams: OpenAI.ChatCompletionCreateParams = {
       model: params.model,
@@ -207,16 +211,11 @@ export class OpenAIProvider implements LLMProvider {
       }
     }
 
-    if (isReasoning && thinkingLevel !== 'off') {
-      (requestParams as unknown as Record<string, unknown>).reasoning_effort = thinkingLevel;
-    } else {
-      requestParams.max_tokens = params.maxTokens ?? 4096;
-      if (params.temperature !== undefined) {
-        requestParams.temperature = params.temperature;
-      }
-    }
+    applyReasoningConfig(requestParams, params.model, thinkingLevel, params.maxTokens, params.temperature);
 
-    const response = await this.client.chat.completions.create(requestParams);
+    const response = await this.client.chat.completions.create(
+      requestParams,
+    );
     const choice = response.choices[0];
 
     const toolCalls: ToolCall[] = (choice?.message?.tool_calls ?? []).map((tc) => {

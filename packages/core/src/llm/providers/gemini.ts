@@ -10,6 +10,7 @@ import type {
   Message,
   MessageContent,
 } from '../types.js';
+import { MODEL_CATALOG } from '../model-catalog.js';
 
 // ---------------------------------------------------------------------------
 // Gemini API types (direct HTTP, no SDK dependency)
@@ -43,15 +44,12 @@ export const geminiProviderFactory: ProviderFactory = {
   create: (config) => new GeminiProvider(config),
 };
 
-export const GEMINI_MODELS = [
-  'gemini-2.5-pro',
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-] as const;
-
 export class GeminiProvider implements LLMProvider {
   readonly name = 'gemini';
-  readonly models: string[] = [...GEMINI_MODELS];
+
+  get models(): string[] {
+    return MODEL_CATALOG.filter((e) => e.provider === 'gemini').map((e) => e.id);
+  }
 
   private apiKey: string;
   private baseUrl: string;
