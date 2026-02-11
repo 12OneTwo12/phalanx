@@ -1,5 +1,5 @@
 import type { TokenUsageRecord, TokenUsageSummary } from './types.js';
-import { ModelCatalogRegistry } from './model-catalog.js';
+import { ModelCatalogRegistry, isModelMatch } from './model-catalog.js';
 
 // ---------------------------------------------------------------------------
 // TokenTracker — in-memory tracker (persists to DB in W3)
@@ -39,10 +39,10 @@ export class TokenTracker {
       const entry = this.findCatalogEntry(r.provider, r.model);
       const cost = entry?.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 
-      // Catalog costs are per 1M tokens
+      // Catalog costs are per 1M tokens. Thinking tokens are billed as output tokens.
       const recordCost =
         (r.inputTokens * cost.input) / 1_000_000 +
-        (r.outputTokens * cost.output) / 1_000_000;
+        ((r.outputTokens + r.thinkingTokens) * cost.output) / 1_000_000;
 
       totalInput += r.inputTokens;
       totalOutput += r.outputTokens;
@@ -104,7 +104,7 @@ export class TokenTracker {
     // Prefix match
     const providerModels = this.catalog.getProviderModels(provider);
     for (const entry of providerModels) {
-      if (model.startsWith(entry.id) || entry.id.startsWith(model)) {
+      if (isModelMatch(model, entry.id)) {
         return entry;
       }
     }

@@ -91,6 +91,8 @@ export interface ToolUseContent {
 export interface ToolResultContent {
   type: 'tool_result';
   toolUseId: string;
+  /** Function name (needed for Gemini's functionResponse correlation) */
+  name?: string;
   content: string;
   isError?: boolean;
 }

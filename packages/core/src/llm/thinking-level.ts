@@ -1,5 +1,5 @@
 import type { ThinkingLevel } from './types.js';
-import { ModelCatalogRegistry } from './model-catalog.js';
+import { ModelCatalogRegistry, isModelMatch } from './model-catalog.js';
 
 // ---------------------------------------------------------------------------
 // Thinking budget mappings per provider
@@ -59,9 +59,7 @@ export function supportsThinking(
   catalog: ModelCatalogRegistry = DEFAULT_CATALOG,
 ): boolean {
   for (const entry of catalog.getAllEntries()) {
-    const matches =
-      entry.id === model || model.startsWith(entry.id) || entry.id.startsWith(model);
-    if (matches) {
+    if (isModelMatch(model, entry.id)) {
       return entry.compat?.supportsThinking === true || entry.reasoning === true;
     }
   }

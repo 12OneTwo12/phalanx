@@ -180,6 +180,27 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Model ID matching
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if a model string matches a catalog entry ID.
+ * Supports exact match and version-suffix matching (date suffixes like '-20250929').
+ * Prevents false positives like 'o3' matching 'o3-mini'.
+ */
+export function isModelMatch(model: string, entryId: string): boolean {
+  if (model === entryId) return true;
+  // model has version suffix beyond entry (e.g., model='claude-opus-4-6-20250414-xxx', entry='claude-opus-4-6-20250414')
+  if (model.startsWith(entryId + '-')) return true;
+  // entry has version suffix beyond model (e.g., model='claude-sonnet-4-5', entry='claude-sonnet-4-5-20250929')
+  if (entryId.startsWith(model + '-')) {
+    const suffix = entryId.slice(model.length + 1);
+    return /^\d/.test(suffix); // Only match date-like suffixes, not 'mini' etc.
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Catalog lookup helpers
 // ---------------------------------------------------------------------------
 

@@ -16,14 +16,20 @@ import { MODEL_CATALOG } from '../model-catalog.js';
 // Gemini API types (direct HTTP, no SDK dependency)
 // ---------------------------------------------------------------------------
 
+interface GeminiPart {
+  text?: string;
+  functionCall?: { name: string; args: Record<string, unknown> };
+  functionResponse?: { name: string; response: Record<string, unknown> };
+}
+
 interface GeminiContent {
   role: 'user' | 'model';
-  parts: Array<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }>;
+  parts: GeminiPart[];
 }
 
 interface GeminiResponse {
   candidates: Array<{
-    content: { parts: Array<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }> };
+    content: { parts: GeminiPart[] };
     finishReason: string;
   }>;
   usageMetadata?: {
@@ -84,13 +90,20 @@ export class GeminiProvider implements LLMProvider {
       if (typeof msg.content === 'string') {
         contents.push({ role, parts: [{ text: msg.content }] });
       } else {
-        const parts: GeminiContent['parts'] = [];
+        const parts: GeminiPart[] = [];
         for (const c of msg.content as MessageContent[]) {
           if (c.type === 'text') {
             parts.push({ text: c.text });
           } else if (c.type === 'tool_use') {
             parts.push({
               functionCall: { name: c.name, args: c.input },
+            });
+          } else if (c.type === 'tool_result') {
+            parts.push({
+              functionResponse: {
+                name: c.name ?? c.toolUseId,
+                response: { content: c.content },
+              },
             });
           }
         }

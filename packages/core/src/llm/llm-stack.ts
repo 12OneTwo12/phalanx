@@ -31,6 +31,8 @@ export interface PhalanxLLMConfig {
   cooldownMs?: number;
   /** Additional provider factories to register beyond built-ins */
   additionalFactories?: ProviderFactory[];
+  /** Environment variables (defaults to process.env, injectable for testing) */
+  env?: Record<string, string | undefined>;
 }
 
 export function createLLMStack(config: PhalanxLLMConfig = {}): {
@@ -41,7 +43,7 @@ export function createLLMStack(config: PhalanxLLMConfig = {}): {
   const registry = new ProviderRegistry();
   const healthTracker = new ProviderHealthTracker(config.cooldownMs);
 
-  const env = process.env as Record<string, string | undefined>;
+  const env = config.env ?? (process.env as Record<string, string | undefined>);
   const factories = [...BUILT_IN_PROVIDER_FACTORIES, ...(config.additionalFactories ?? [])];
 
   for (const factory of factories) {
