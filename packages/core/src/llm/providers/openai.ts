@@ -18,7 +18,7 @@ import { effectiveThinkingLevel } from '../thinking-level.js';
 // OpenAI message conversion
 // ---------------------------------------------------------------------------
 
-function toOpenAIMessages(
+export function toOpenAIMessages(
   messages: Message[],
   systemPrompt?: string,
 ): OpenAI.ChatCompletionMessageParam[] {
@@ -95,7 +95,7 @@ function toOpenAIMessages(
   return result;
 }
 
-function toOpenAITools(
+export function toOpenAITools(
   tools: ChatWithToolsParams['tools'],
 ): OpenAI.ChatCompletionTool[] {
   return tools.map((t) => ({

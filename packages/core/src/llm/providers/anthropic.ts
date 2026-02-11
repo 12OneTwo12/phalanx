@@ -17,7 +17,7 @@ import { effectiveThinkingLevel, resolveAnthropicThinking } from '../thinking-le
 // Anthropic message conversion
 // ---------------------------------------------------------------------------
 
-function toAnthropicMessages(
+export function toAnthropicMessages(
   messages: Message[],
 ): Anthropic.MessageCreateParams['messages'] {
   return messages
@@ -54,7 +54,7 @@ function toAnthropicMessages(
     });
 }
 
-function toAnthropicTools(
+export function toAnthropicTools(
   tools: ChatWithToolsParams['tools'],
 ): Anthropic.Tool[] {
   return tools.map((t) => ({
