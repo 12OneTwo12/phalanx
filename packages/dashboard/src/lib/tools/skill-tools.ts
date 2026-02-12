@@ -7,21 +7,26 @@ import { SkillLoader, SkillRegistry } from '@phalanx/core';
 // Singleton registry, lazily initialized
 let _registry: SkillRegistry | null = null;
 
+function getProjectRoot(): string {
+  return process.env.PHALANX_PROJECT_ROOT ?? process.cwd();
+}
+
 function getRegistry(): SkillRegistry {
   if (!_registry) {
-    const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? process.cwd();
-    const loader = new SkillLoader({ projectRoot });
+    const loader = new SkillLoader({ projectRoot: getProjectRoot() });
     _registry = new SkillRegistry(loader.loadAll());
   }
   return _registry;
 }
 
-/** Reset registry (for tests or reload). */
+/** Reset registry (for reload after mutations). */
 export function resetSkillRegistry(): void {
   _registry = null;
 }
 
-// -- skill_list --------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// skill_list
+// ---------------------------------------------------------------------------
 
 const skillListSchema = {
   role: z.string().optional().describe('Filter by agent role'),
@@ -43,15 +48,22 @@ export const skillListTool: Tool<typeof skillListSchema> = {
         description: s.description,
         source: s.source,
         roles: s.metadata?.roles ?? [],
+        emoji: s.metadata?.emoji,
       }));
       return { success: true, content: JSON.stringify(summary, null, 2) };
     } catch (err) {
-      return { success: false, content: '', error: `Failed to list skills: ${err instanceof Error ? err.message : String(err)}` };
+      return {
+        success: false,
+        content: '',
+        error: `Failed to list skills: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
   },
 };
 
-// -- skill_read --------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// skill_read
+// ---------------------------------------------------------------------------
 
 const skillReadSchema = {
   name: z.string().describe('Skill name to read'),
@@ -70,76 +82,101 @@ export const skillReadTool: Tool<typeof skillReadSchema> = {
       }
       return { success: true, content: JSON.stringify(skill, null, 2) };
     } catch (err) {
-      return { success: false, content: '', error: `Failed to read skill: ${err instanceof Error ? err.message : String(err)}` };
+      return {
+        success: false,
+        content: '',
+        error: `Failed to read skill: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
   },
 };
 
-// -- skill_create ------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// skill_create
+// ---------------------------------------------------------------------------
 
 const skillCreateSchema = {
   name: z.string().describe('Skill name (used as directory name)'),
   description: z.string().describe('Skill description'),
   content: z.string().describe('Skill instructions (markdown body)'),
-  roles: z.array(z.string()).optional().describe('Agent roles that can use this skill'),
+  metadata: z
+    .object({
+      emoji: z.string().optional(),
+      roles: z.array(z.string()).optional(),
+      requires: z
+        .object({
+          bins: z.array(z.string()).optional(),
+          env: z.array(z.string()).optional(),
+        })
+        .optional(),
+    })
+    .optional()
+    .describe('Skill metadata (roles, emoji, requirements)'),
 };
 
 export const skillCreateTool: Tool<typeof skillCreateSchema> = {
   name: 'skill_create',
-  description: 'Create a new skill in the workspace skills directory.',
+  description:
+    'Create a new skill in the workspace skills directory. Generates SKILL.md with frontmatter.',
   category: 'skills',
   schema: skillCreateSchema,
   async execute(params, _context: ToolExecutionContext): Promise<ToolResult> {
     try {
-      const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? process.cwd();
-      const skillDir = path.join(projectRoot, 'skills', params.name);
+      const skillDir = path.join(getProjectRoot(), 'skills', params.name);
 
       if (fs.existsSync(skillDir)) {
-        return { success: false, content: '', error: `Skill directory already exists: ${params.name}` };
+        return { success: false, content: '', error: `Skill already exists: ${params.name}` };
       }
 
       fs.mkdirSync(skillDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(skillDir, 'SKILL.md'),
+        buildSkillMd(params.name, params.description, params.content, params.metadata),
+      );
 
-      const frontmatter = [
-        '---',
-        `name: ${params.name}`,
-        `description: ${params.description}`,
-      ];
-      if (params.roles && params.roles.length > 0) {
-        frontmatter.push('roles:');
-        for (const role of params.roles) {
-          frontmatter.push(`  - ${role}`);
-        }
-      }
-      frontmatter.push('---', '');
-
-      const fileContent = frontmatter.join('\n') + '\n' + params.content + '\n';
-      fs.writeFileSync(path.join(skillDir, 'SKILL.md'), fileContent);
-
-      // Reload registry
       resetSkillRegistry();
-      const registry = getRegistry();
-      const skill = registry.get(params.name);
+      const skill = getRegistry().get(params.name);
 
-      return { success: true, content: `Created skill: ${params.name}\n${JSON.stringify(skill, null, 2)}` };
+      return {
+        success: true,
+        content: `Created skill: ${params.name}\n${JSON.stringify(skill, null, 2)}`,
+      };
     } catch (err) {
-      return { success: false, content: '', error: `Failed to create skill: ${err instanceof Error ? err.message : String(err)}` };
+      return {
+        success: false,
+        content: '',
+        error: `Failed to create skill: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
   },
 };
 
-// -- skill_update ------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// skill_update
+// ---------------------------------------------------------------------------
 
 const skillUpdateSchema = {
   name: z.string().describe('Skill name to update'),
   description: z.string().optional().describe('New description'),
   content: z.string().optional().describe('New instructions content'),
-  roles: z.array(z.string()).optional().describe('New roles list'),
+  metadata: z
+    .object({
+      emoji: z.string().optional(),
+      roles: z.array(z.string()).optional(),
+      requires: z
+        .object({
+          bins: z.array(z.string()).optional(),
+          env: z.array(z.string()).optional(),
+        })
+        .optional(),
+    })
+    .optional()
+    .describe('New metadata'),
 };
 
 export const skillUpdateTool: Tool<typeof skillUpdateSchema> = {
   name: 'skill_update',
-  description: 'Update an existing skill.',
+  description: 'Update an existing skill. Merges provided fields with existing values.',
   category: 'skills',
   schema: skillUpdateSchema,
   async execute(params, _context: ToolExecutionContext): Promise<ToolResult> {
@@ -150,31 +187,30 @@ export const skillUpdateTool: Tool<typeof skillUpdateSchema> = {
         return { success: false, content: '', error: `Skill not found: ${params.name}` };
       }
 
-      const skillFile = path.join(existing.path, 'SKILL.md');
       const desc = params.description ?? existing.description;
       const body = params.content ?? existing.content;
-      const roles = params.roles ?? existing.metadata?.roles;
+      const meta = params.metadata ?? existing.metadata;
 
-      const frontmatter = ['---', `name: ${params.name}`, `description: ${desc}`];
-      if (roles && roles.length > 0) {
-        frontmatter.push('roles:');
-        for (const role of roles) {
-          frontmatter.push(`  - ${role}`);
-        }
-      }
-      frontmatter.push('---', '');
-
-      fs.writeFileSync(skillFile, frontmatter.join('\n') + '\n' + body + '\n');
+      fs.writeFileSync(
+        path.join(existing.baseDir, 'SKILL.md'),
+        buildSkillMd(params.name, desc, body, meta),
+      );
 
       resetSkillRegistry();
       return { success: true, content: `Updated skill: ${params.name}` };
     } catch (err) {
-      return { success: false, content: '', error: `Failed to update skill: ${err instanceof Error ? err.message : String(err)}` };
+      return {
+        success: false,
+        content: '',
+        error: `Failed to update skill: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
   },
 };
 
-// -- skill_delete ------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// skill_delete
+// ---------------------------------------------------------------------------
 
 const skillDeleteSchema = {
   name: z.string().describe('Skill name to delete'),
@@ -182,7 +218,7 @@ const skillDeleteSchema = {
 
 export const skillDeleteTool: Tool<typeof skillDeleteSchema> = {
   name: 'skill_delete',
-  description: 'Delete a skill from the workspace.',
+  description: 'Delete a skill from the workspace. Only workspace-source skills can be deleted.',
   category: 'skills',
   schema: skillDeleteSchema,
   async execute(params, _context: ToolExecutionContext): Promise<ToolResult> {
@@ -194,15 +230,50 @@ export const skillDeleteTool: Tool<typeof skillDeleteSchema> = {
       }
 
       if (existing.source !== 'workspace') {
-        return { success: false, content: '', error: `Can only delete workspace skills. This skill is from: ${existing.source}` };
+        return {
+          success: false,
+          content: '',
+          error: `Can only delete workspace skills. This skill is from: ${existing.source}`,
+        };
       }
 
-      fs.rmSync(existing.path, { recursive: true, force: true });
+      fs.rmSync(existing.baseDir, { recursive: true, force: true });
       resetSkillRegistry();
 
       return { success: true, content: `Deleted skill: ${params.name}` };
     } catch (err) {
-      return { success: false, content: '', error: `Failed to delete skill: ${err instanceof Error ? err.message : String(err)}` };
+      return {
+        success: false,
+        content: '',
+        error: `Failed to delete skill: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
   },
 };
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+interface SkillMetaInput {
+  emoji?: string;
+  roles?: string[];
+  requires?: { bins?: string[]; env?: string[] };
+}
+
+function buildSkillMd(
+  name: string,
+  description: string,
+  content: string,
+  metadata?: SkillMetaInput,
+): string {
+  const lines = ['---', `name: ${name}`, `description: ${description}`];
+
+  if (metadata && Object.keys(metadata).length > 0) {
+    const metaObj: Record<string, unknown> = { phalanx: metadata };
+    lines.push(`metadata: ${JSON.stringify(metaObj)}`);
+  }
+
+  lines.push('---', '', content, '');
+  return lines.join('\n');
+}
