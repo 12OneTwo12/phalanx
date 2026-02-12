@@ -2,7 +2,7 @@
  * Heartbeat SSE bridge — connects the HeartbeatService to the EventBus
  * so heartbeat reports are delivered to SSE-connected dashboard clients.
  */
-import type { HeartbeatService } from '@phalanx/core';
+import type { HeartbeatService, HeartbeatReport } from '@phalanx/core';
 import { eventBus } from './event-bus';
 
 /**
@@ -10,7 +10,7 @@ import { eventBus } from './event-bus';
  * Returns a cleanup function that removes all listeners.
  */
 export function bridgeHeartbeatToSSE(heartbeatService: HeartbeatService): () => void {
-  const onReport = (data: { report: Record<string, unknown> }) => {
+  const onReport = (data: { report: HeartbeatReport }) => {
     eventBus.emit('heartbeat:report', {
       report: data.report,
     });

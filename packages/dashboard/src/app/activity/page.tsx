@@ -16,7 +16,7 @@ const LEVEL_COLORS: Record<string, string> = {
 /** Debounce a value by the given delay in ms */
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     timerRef.current = setTimeout(() => setDebounced(value), delayMs);

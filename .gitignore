@@ -37,6 +37,10 @@ yarn-error.log*
 coverage/
 .tmp/
 
+# Generated
+*.tsbuildinfo
+next-env.d.ts
+
 # Database (local dev)
 *.sqlite
 *.sqlite3

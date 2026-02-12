@@ -41,10 +41,9 @@ function buildPlist(opts: DaemonInstallOpts): string {
 }
 
 /**
- * Parse `ps` elapsed time format (e.g. "01:23", "2-03:45:12") into
- * a human-readable string like "2d 3h 45m".
+ * Parse `ps` elapsed time format (e.g. "01:23", "2-03:45:12") into total seconds.
  */
-function parseEtime(etime: string): string {
+function parseEtime(etime: string): number {
   // Format: [[DD-]HH:]MM:SS
   const parts = etime.split('-');
   let days = 0;
@@ -56,17 +55,16 @@ function parseEtime(etime: string): string {
   const segments = timePart.split(':').map((s) => parseInt(s, 10));
   let hours = 0;
   let minutes = 0;
+  let seconds = 0;
   if (segments.length === 3) {
     hours = segments[0];
     minutes = segments[1];
+    seconds = segments[2];
   } else if (segments.length === 2) {
     minutes = segments[0];
+    seconds = segments[1];
   }
-  const result: string[] = [];
-  if (days > 0) result.push(`${days}d`);
-  if (hours > 0) result.push(`${hours}h`);
-  if (minutes > 0 || result.length === 0) result.push(`${minutes}m`);
-  return result.join(' ');
+  return days * 86400 + hours * 3600 + minutes * 60 + seconds;
 }
 
 export class LaunchdService implements DaemonService {
@@ -125,7 +123,7 @@ export class LaunchdService implements DaemonService {
       }
     }
 
-    let uptime: string | null = null;
+    let uptime: number | null = null;
     if (pid) {
       try {
         const etime = execSync(`ps -p ${pid} -o etime=`, { encoding: 'utf-8' }).trim();

@@ -8,13 +8,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ─── EventBus Edge Cases ───────────────────────────────────────────────────────
 
 describe('EventBus — edge cases', () => {
-  // Use a fresh EventBus for isolation
-  let EventBusClass: new () => {
-    subscribe: (listener: (event: any) => void) => () => void;
-    emit: (type: string, payload?: Record<string, unknown>) => void;
-    subscriberCount: number;
-  };
-
   beforeEach(async () => {
     // Re-import to get fresh module state is tricky with singletons,
     // so we test via the exported singleton with cleanup

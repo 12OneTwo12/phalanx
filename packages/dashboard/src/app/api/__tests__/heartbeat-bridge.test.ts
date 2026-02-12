@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { bridgeHeartbeatToSSE } from '@/lib/heartbeat-bridge';
 import { eventBus } from '@/lib/event-bus';
