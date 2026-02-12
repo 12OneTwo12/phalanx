@@ -7,6 +7,7 @@ export { AssignmentService } from './assignment-service.js';
 export { Orchestrator, type TicketExecutor } from './orchestrator.js';
 export { VerificationService, type VerificationStrategy } from './verification-service.js';
 export { ProposalService } from './proposal-service.js';
+export { ProposalExecutor, type ProposalExecutionResult } from './proposal-executor.js';
 export { BranchManager, type GitOperations } from './branch-manager.js';
 export {
   AgentTicketExecutor,

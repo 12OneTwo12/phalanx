@@ -1,6 +1,7 @@
-import { getProposalRepository, getReverseProposalRepository } from '@/lib/db';
+import { getProposalRepository, getReverseProposalRepository, getTicketRepository } from '@/lib/db';
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-utils';
 import { eventBus } from '@/lib/event-bus';
+import { ProposalExecutor } from '@phalanx/core';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -45,6 +46,13 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   const updated = repo.update(id, { status: body.status });
   if (!updated) return errorResponse('Proposal not found', 404);
 
+  // Execute side-effects when approved
+  let executionResult;
+  if (body.status === 'approved') {
+    const executor = new ProposalExecutor(repo, getTicketRepository());
+    executionResult = executor.execute(id);
+  }
+
   eventBus.emit('proposal:updated', { proposalId: id, status: body.status });
-  return jsonResponse(updated);
+  return jsonResponse({ ...updated, execution: executionResult });
 }
