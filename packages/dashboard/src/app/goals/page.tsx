@@ -76,7 +76,7 @@ export default function GoalsPage() {
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[goal.status] ?? ''}`}>
                       {goal.status}
                     </span>
-                    <span>{goal.epicCount} epics</span>
+                    <span>{goal.epicCount} {goal.epicCount === 1 ? 'epic' : 'epics'}</span>
                   </div>
                 </div>
                 <div className="ml-4 text-right">
