@@ -15,6 +15,7 @@ import type { VerificationService } from './verification-service.js';
 import type { AssignmentService } from './assignment-service.js';
 import type { GoalManager } from './goal-manager.js';
 import type { PRCreator } from './pr/pr-creator.js';
+import { TicketStateMachine } from './ticket-state-machine.js';
 
 export class CompletionHandler extends EventEmitter {
   constructor(
@@ -108,6 +109,57 @@ export class CompletionHandler extends EventEmitter {
       // Agent release must happen regardless of escalation record creation errors
       if (ticket.assignedAgentId) {
         this.assignmentService.release(ticket.assignedAgentId);
+      }
+    }
+  }
+
+  /**
+   * Handle a failed ticket execution.
+   * Retries if under maxRetries (agent stays assigned for re-execution).
+   * Escalates and releases agent when max retries exceeded.
+   */
+  handleFailure(ticketId: string, maxRetries = 3): void {
+    const ticket = this.ticketRepo.findById(ticketId);
+    if (!ticket) {
+      this.emit('warning', { message: `handleFailure: ticket ${ticketId} not found` });
+      return;
+    }
+
+    // If ticket isn't in 'failed' state (e.g., state transition failed), just release agent
+    if (ticket.status !== 'failed') {
+      if (ticket.assignedAgentId) {
+        this.assignmentService.release(ticket.assignedAgentId);
+      }
+      return;
+    }
+
+    if (ticket.retryCount < maxRetries) {
+      // Retry: transition failed → in_progress, keep agent assigned for re-execution
+      const retrying = TicketStateMachine.transition('failed', 'retry');
+      this.ticketRepo.update(ticketId, {
+        status: retrying,
+        retryCount: ticket.retryCount + 1,
+      });
+      this.emit('ticket:retrying', { ticketId, retryCount: ticket.retryCount + 1 });
+    } else {
+      // Max retries exceeded → escalate and release agent
+      try {
+        const escalated = TicketStateMachine.transition('failed', 'escalate');
+        this.ticketRepo.update(ticketId, { status: escalated });
+        this.escalationRepo.create({
+          id: randomUUID(),
+          type: 'alert',
+          title: `Ticket failed after ${maxRetries} retries: ${ticket.title}`,
+          description: `Ticket ${ticketId} exceeded maximum retry count (${maxRetries}).`,
+          requestedBy: ticket.assignedAgentId ?? 'system',
+          status: 'pending',
+          blockedTasks: JSON.stringify([ticketId]),
+        });
+        this.emit('ticket:escalated', { ticketId });
+      } finally {
+        if (ticket.assignedAgentId) {
+          this.assignmentService.release(ticket.assignedAgentId);
+        }
       }
     }
   }

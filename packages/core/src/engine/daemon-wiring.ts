@@ -10,6 +10,7 @@
  *   ticket:submitted → verification → pass/fail/escalation
  *   verification:passed → goal progress + release agent
  *   verification:escalated → escalation record + release agent
+ *   ticket:failed / ticket:error → retry or escalate + release agent
  *   Smart assignment: backlog tickets → analyze → assign
  */
 import { randomUUID } from 'node:crypto';
@@ -140,19 +141,31 @@ export class DaemonWiring {
       });
     }
 
-    // 6. Forward key orchestrator events to SSE
+    // 6. Ticket failure handling — retry or escalate + release agent
+    this.on(orchestrator, 'ticket:failed', (data: { ticketId: string; error?: string }) => {
+      completionHandler.handleFailure(data.ticketId);
+      eventBus?.emit('ticket:failed', { ticketId: data.ticketId, error: data.error });
+    });
+
+    // Handle unexpected execution errors the same way
+    this.on(orchestrator, 'ticket:error', (data: { ticketId: string; error?: string }) => {
+      completionHandler.handleFailure(data.ticketId);
+      eventBus?.emit('ticket:error', { ticketId: data.ticketId, error: data.error });
+    });
+
+    // 7. Forward key orchestrator events to SSE
     if (eventBus) {
       this.on(orchestrator, 'ticket:started', (data: { ticketId: string }) => {
         eventBus.emit('ticket:started', { ticketId: data.ticketId });
-      });
-      this.on(orchestrator, 'ticket:failed', (data: { ticketId: string; error?: string }) => {
-        eventBus.emit('ticket:failed', { ticketId: data.ticketId, error: data.error });
       });
       this.on(completionHandler, 'ticket:completed', (data: { ticketId: string }) => {
         eventBus.emit('ticket:completed', { ticketId: data.ticketId });
       });
       this.on(completionHandler, 'ticket:escalated', (data: { ticketId: string }) => {
         eventBus.emit('ticket:escalated', { ticketId: data.ticketId });
+      });
+      this.on(completionHandler, 'ticket:retrying', (data: { ticketId: string; retryCount: number }) => {
+        eventBus.emit('ticket:retrying', { ticketId: data.ticketId, retryCount: data.retryCount });
       });
       this.on(completionHandler, 'goal:progressUpdated', (data: { goalId: string; progress: number }) => {
         eventBus.emit('goal:progress', { goalId: data.goalId, progress: data.progress });
