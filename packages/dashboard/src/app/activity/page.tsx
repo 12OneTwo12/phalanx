@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { fetcher, apiUrl } from '@/lib/api-client';
 import type { ActivityLog } from '@phalanx/core';
 import { useEventStream } from '@/hooks/use-event-stream';
+import { useAgentNames } from '@/hooks/use-agent-names';
 
 const LEVEL_COLORS: Record<string, string> = {
   info: 'text-blue-400',
@@ -29,6 +30,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 export default function ActivityPage() {
   const [filter, setFilter] = useState<{ agentId?: string; ticketId?: string }>({});
   const debouncedFilter = useDebouncedValue(filter, 300);
+  const agentNames = useAgentNames();
 
   const url = apiUrl('/activity', {
     agentId: debouncedFilter.agentId,
@@ -52,13 +54,16 @@ export default function ActivityPage() {
 
       {/* Filters */}
       <div className="mb-4 flex gap-3">
-        <input
-          type="text"
-          placeholder="Filter by agent ID..."
+        <select
           value={filter.agentId ?? ''}
           onChange={(e) => setFilter((f) => ({ ...f, agentId: e.target.value || undefined }))}
-          className="rounded-md border border-gray-700 bg-gray-900 px-3 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none"
-        />
+          className="rounded-md border border-gray-700 bg-gray-900 px-3 py-1.5 text-sm text-gray-100 focus:border-blue-500 focus:outline-none"
+        >
+          <option value="">All agents</option>
+          {Array.from(agentNames.entries()).map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
+          ))}
+        </select>
         <input
           type="text"
           placeholder="Filter by ticket ID..."
@@ -93,7 +98,7 @@ export default function ActivityPage() {
                 {log.level.toUpperCase()}
               </span>
               <span className="shrink-0 w-24 truncate text-xs text-gray-500" title={log.agentId ?? undefined}>
-                {log.agentId ?? '—'}
+                {log.agentId ? (agentNames.get(log.agentId) ?? log.agentId) : '—'}
               </span>
               <span className="flex-1 text-gray-300">{log.action}</span>
             </div>

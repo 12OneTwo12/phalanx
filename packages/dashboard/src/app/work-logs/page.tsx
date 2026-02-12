@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/api-client';
+import { useAgentNames } from '@/hooks/use-agent-names';
+import { useTicketTitles } from '@/hooks/use-ticket-titles';
 
 interface AgentSummary {
   agentId: string;
@@ -29,6 +31,8 @@ export default function WorkLogsPage() {
     `/api/work-logs/summary?date=${date}`,
     fetcher,
   );
+  const agentNames = useAgentNames();
+  const ticketTitles = useTicketTitles();
 
   return (
     <div>
@@ -64,7 +68,7 @@ export default function WorkLogsPage() {
                   key={agent.agentId}
                   className="rounded-lg border border-gray-800 bg-gray-900 p-4"
                 >
-                  <h3 className="mb-2 text-sm font-semibold text-gray-200">{agent.agentId}</h3>
+                  <h3 className="mb-2 text-sm font-semibold text-gray-200">{agentNames.get(agent.agentId) ?? agent.agentId}</h3>
                   <div className="flex gap-4 text-xs">
                     {agent.started > 0 && (
                       <span className="text-blue-400">Started: {agent.started}</span>
@@ -81,7 +85,7 @@ export default function WorkLogsPage() {
                   </div>
                   {agent.ticketsWorked.length > 0 && (
                     <p className="mt-1 text-xs text-gray-500">
-                      Tickets: {agent.ticketsWorked.join(', ')}
+                      Tickets: {agent.ticketsWorked.map((id) => ticketTitles.get(id) ?? id).join(', ')}
                     </p>
                   )}
                 </div>

@@ -2,6 +2,8 @@
 
 import useSWR from 'swr';
 import { fetcher } from '@/lib/api-client';
+import { useTicketTitles } from '@/hooks/use-ticket-titles';
+import Link from 'next/link';
 
 interface DecisionRecord {
   id: string;
@@ -17,6 +19,7 @@ interface DecisionRecord {
 
 export default function DecisionsPage() {
   const { data: decisions, isLoading } = useSWR<DecisionRecord[]>('/api/decisions', fetcher);
+  const ticketTitles = useTicketTitles();
 
   return (
     <div>
@@ -54,7 +57,11 @@ export default function DecisionsPage() {
               </div>
               <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
                 <span>By: {d.madeBy}</span>
-                {d.relatedTicketId && <span>Ticket: {d.relatedTicketId}</span>}
+                {d.relatedTicketId && (
+                  <Link href={`/tickets/${d.relatedTicketId}`} className="hover:text-blue-400">
+                    Ticket: {ticketTitles.get(d.relatedTicketId) ?? d.relatedTicketId}
+                  </Link>
+                )}
               </div>
             </div>
           ))}
