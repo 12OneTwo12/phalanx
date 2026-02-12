@@ -15,6 +15,7 @@ export {
   DefaultAgentConfigResolver,
   type AgentTicketExecutorConfig,
   type AgentConfigResolver,
+  type PostExecutionHook,
 } from './agent-ticket-executor.js';
 export { injectConventions } from './convention-injector.js';
 export * from './verification/index.js';

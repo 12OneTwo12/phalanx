@@ -5,3 +5,4 @@ export * from './iteration-guard.js';
 export * from './agent-executor.js';
 export * from './agent-factory.js';
 export { MemoryWriter, type MemoryEntry, type MemoryFileSystem } from './memory-writer.js';
+export { MemoryUpdateHook } from './memory-update-hook.js';
