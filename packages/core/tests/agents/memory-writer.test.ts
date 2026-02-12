@@ -109,7 +109,7 @@ Not a list item
     });
 
     it('should return 0 and not write when all entries are duplicates', async () => {
-      mockFs.files.set('/templates/frontend/MEMORY.md', 'Use React hooks');
+      mockFs.files.set('/templates/frontend/MEMORY.md', '- **[pattern]** Use React hooks');
 
       const count = await writer.appendLearnings('frontend', [
         { category: 'pattern', content: 'Use React hooks' },
