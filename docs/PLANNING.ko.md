@@ -1078,6 +1078,13 @@ Agent 팀이 자율적으로 동작하려면 **"기억"** 이 필수. 사람 팀
 │  ├ 소요 시간 / 토큰 비용                                     │
 │  └ 후속 Task 필요 여부                                       │
 │                                                             │
+│  💬 Ticket Comment Thread (Jira-style)                      │
+│  ├ Team Lead가 티켓에 상세 구현 계획을 작성                    │
+│  ├ 각 Agent가 자신의 기여와 진행 상황을 댓글로 기록             │
+│  ├ 스레드 형태로 티켓 상세 페이지에 표시                       │
+│  ├ 자동 생성 — Agent가 작업 시작/완료 시 자동 댓글              │
+│  └ 각 티켓에서 누가 무엇을 했는지 전체 이력 추적 가능           │
+│                                                             │
 │  📚 Knowledge Base (누적 지식)                               │
 │  ├ 프로젝트 컨텍스트 (기술 스택, 아키텍처, 제약 조건)         │
 │  ├ 과거 실패/성공 패턴 ("이전에 A 방식 시도 → 실패 이유")     │
@@ -1089,7 +1096,19 @@ Agent 팀이 자율적으로 동작하려면 **"기억"** 이 필수. 사람 팀
 #### 4.7.2 문서화 플로우
 
 ```
+[Team Lead가 Ticket 분해]
+    ↓
+[첫 번째 티켓 댓글로 상세 구현 계획 작성]
+    ↓
+[Agent가 Ticket을 수령]
+    ↓
+["작업 시작" 댓글 자동 게시 — 접근 방식 개요 포함]
+    ↓
+[Agent가 Ticket 작업 수행 — 주요 마일스톤마다 진행 댓글 게시]
+    ↓
 [Agent가 Task 완료]
+    ↓
+[완료 댓글 자동 게시: 결과물, 접근 방법, 토큰 비용, 후속 작업]
     ↓
 [Task Completion Report 자동 생성]
     ↓
@@ -1161,6 +1180,7 @@ Task 생성: "온보딩 A/B 테스트 결과 분석 및 보고서 작성"
 | Meeting Minutes | 영구 | Dashboard 회의록 탭 / 검색 |
 | Decision Log | 영구 | Dashboard 의사결정 탭 / 검색 |
 | Task Completion Report | Task와 함께 영구 | Task 상세 페이지 |
+| Ticket Comments | Ticket과 함께 영구 | Ticket 상세 페이지 댓글 스레드 |
 | Knowledge Base | 영구 (Agent가 갱신) | Dashboard 지식 탭 / Agent 자동 참조 |
 
 ### 4.8 Direct Channel: 사용자 ↔ Team Lead (CEO ↔ PM 소통)

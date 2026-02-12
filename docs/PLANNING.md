@@ -1089,6 +1089,13 @@ For an Agent team to operate autonomously, **"memory"** is essential. Just as a 
 │  ├ Time spent / token cost                                  │
 │  └ Whether follow-up Tasks are needed                       │
 │                                                             │
+│  💬 Ticket Comment Thread (Jira-style)                      │
+│  ├ Team Lead writes detailed implementation plan on ticket  │
+│  ├ Each Agent comments their contributions and progress     │
+│  ├ Threaded discussion visible on ticket detail page        │
+│  ├ Auto-generated: Agents post status when starting/completing work│
+│  └ Enables full audit trail of who did what on each ticket  │
+│                                                             │
 │  📚 Knowledge Base (Accumulated Knowledge)                  │
 │  ├ Project context (tech stack, architecture, constraints)  │
 │  ├ Past failure/success patterns ("Previously tried approach A → reason for failure")│
@@ -1100,7 +1107,19 @@ For an Agent team to operate autonomously, **"memory"** is essential. Just as a 
 #### 4.7.2 Documentation Flow
 
 ```
+[Team Lead decomposes Ticket]
+    ↓
+[Writes detailed implementation plan as first ticket comment]
+    ↓
+[Agent picks up Ticket]
+    ↓
+[Auto-posts "Started work" comment with approach outline]
+    ↓
+[Agent works on Ticket — posts progress comments at key milestones]
+    ↓
 [Agent completes Task]
+    ↓
+[Auto-posts completion comment: deliverables, approach, token cost, follow-ups]
     ↓
 [Task Completion Report auto-generated]
     ↓
@@ -1172,6 +1191,7 @@ Create Task: "Analyze onboarding A/B test results and write report"
 | Meeting Minutes | Permanent | Dashboard meeting minutes tab / Search |
 | Decision Log | Permanent | Dashboard decisions tab / Search |
 | Task Completion Report | Permanent with Task | Task detail page |
+| Ticket Comments | Permanent with Ticket | Ticket detail page (threaded view) |
 | Knowledge Base | Permanent (Agent-updated) | Dashboard knowledge tab / Auto-referenced by Agents |
 
 ### 4.8 Direct Channel: User ↔ Team Lead (CEO ↔ PM Communication)
