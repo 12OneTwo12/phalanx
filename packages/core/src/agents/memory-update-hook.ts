@@ -30,7 +30,11 @@ export class MemoryUpdateHook implements PostExecutionHook {
     );
 
     if (learnings.length > 0) {
-      await this.writer.appendLearnings(context.role, learnings);
+      try {
+        await this.writer.appendLearnings(context.role, learnings);
+      } catch {
+        // Hook failure should not crash the engine
+      }
     }
   }
 }
