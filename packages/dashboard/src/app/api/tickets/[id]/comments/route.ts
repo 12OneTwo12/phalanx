@@ -1,6 +1,13 @@
 import { getTicketCommentRepository, getTicketRepository } from '@/lib/db';
 import { jsonResponse, errorResponse, newId, parseBody } from '@/lib/api-utils';
 
+const VALID_COMMENT_TYPES = ['plan', 'progress', 'completion', 'review', 'comment'] as const;
+type CommentType = typeof VALID_COMMENT_TYPES[number];
+
+function isValidCommentType(value: unknown): value is CommentType {
+  return typeof value === 'string' && (VALID_COMMENT_TYPES as readonly string[]).includes(value);
+}
+
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
@@ -42,7 +49,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     id: newId(),
     ticketId: id,
     author: body.author,
-    type: (body.type as 'plan' | 'progress' | 'completion' | 'review' | 'comment') ?? 'comment',
+    type: isValidCommentType(body.type) ? body.type : 'comment',
     content: body.content,
     metadata: body.metadata ?? null,
   });

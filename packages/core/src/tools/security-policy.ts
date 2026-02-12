@@ -64,6 +64,12 @@ export class DefaultSecurityPolicy implements SecurityPolicy {
   }
 
   async resolveSafePath(filePath: string, workingDirectory: string): Promise<string | null> {
-    return resolveSafePath(filePath, workingDirectory);
+    // Pre-check: reject obviously sensitive paths before resolution
+    if (isSensitivePath(filePath, this.config.blockedPaths)) return null;
+    const resolved = await resolveSafePath(filePath, workingDirectory);
+    if (resolved === null) return null;
+    // Post-check: reject if resolved path (after symlink resolution) is sensitive
+    if (isSensitivePath(resolved, this.config.blockedPaths)) return null;
+    return resolved;
   }
 }

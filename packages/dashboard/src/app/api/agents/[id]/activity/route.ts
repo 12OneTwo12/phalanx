@@ -20,9 +20,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
   // Get work logs for this agent
   const workLogs = workLogRepo.findByAgentId(id);
 
-  // Get tickets assigned to or completed by this agent
-  const allTickets = ticketRepo.findAll();
-  const agentTickets = allTickets.filter((t) => t.assignedAgentId === id);
+  // Get tickets assigned to this agent (use indexed query instead of full scan)
+  const agentTickets = ticketRepo.findByAgentId(id);
 
   return jsonResponse({
     agent: {

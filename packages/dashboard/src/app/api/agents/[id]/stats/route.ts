@@ -21,9 +21,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
   const ticketRepo = getTicketRepository();
   const tokenRepo = getTokenUsageRepository();
 
-  // Get all tickets ever assigned to this agent
-  const allTickets = ticketRepo.findAll();
-  const agentTickets = allTickets.filter((t) => t.assignedAgentId === id);
+  // Get tickets assigned to this agent (use indexed query instead of full scan)
+  const agentTickets = ticketRepo.findByAgentId(id);
 
   const completed = agentTickets.filter((t) => t.status === 'done');
   const failed = agentTickets.filter((t) => t.status === 'failed' || t.status === 'escalated');

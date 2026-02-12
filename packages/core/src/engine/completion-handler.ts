@@ -47,16 +47,18 @@ export class CompletionHandler extends EventEmitter {
       return;
     }
 
-    // Update goal progress
-    const epic = this.epicRepo.findById(ticket.epicId);
-    if (epic?.goalId) {
-      const progress = this.goalManager.calculateProgress(epic.goalId);
-      this.emit('goal:progressUpdated', { goalId: epic.goalId, progress });
-    }
-
-    // Release agent
-    if (ticket.assignedAgentId) {
-      this.assignmentService.release(ticket.assignedAgentId);
+    try {
+      // Update goal progress
+      const epic = this.epicRepo.findById(ticket.epicId);
+      if (epic?.goalId) {
+        const progress = this.goalManager.calculateProgress(epic.goalId);
+        this.emit('goal:progressUpdated', { goalId: epic.goalId, progress });
+      }
+    } finally {
+      // Agent release must happen regardless of goal progress errors
+      if (ticket.assignedAgentId) {
+        this.assignmentService.release(ticket.assignedAgentId);
+      }
     }
 
     this.emit('ticket:completed', { ticketId });
@@ -73,19 +75,21 @@ export class CompletionHandler extends EventEmitter {
       return;
     }
 
-    this.escalationRepo.create({
-      id: randomUUID(),
-      type: 'alert',
-      title: `Ticket escalated: ${ticket.title}`,
-      description: `Ticket ${ticketId} failed verification after ${ticket.retryCount} retries.`,
-      requestedBy: ticket.assignedAgentId ?? 'system',
-      status: 'pending',
-      blockedTasks: JSON.stringify([ticketId]),
-    });
-
-    // Release agent
-    if (ticket.assignedAgentId) {
-      this.assignmentService.release(ticket.assignedAgentId);
+    try {
+      this.escalationRepo.create({
+        id: randomUUID(),
+        type: 'alert',
+        title: `Ticket escalated: ${ticket.title}`,
+        description: `Ticket ${ticketId} failed verification after ${ticket.retryCount} retries.`,
+        requestedBy: ticket.assignedAgentId ?? 'system',
+        status: 'pending',
+        blockedTasks: JSON.stringify([ticketId]),
+      });
+    } finally {
+      // Agent release must happen regardless of escalation record creation errors
+      if (ticket.assignedAgentId) {
+        this.assignmentService.release(ticket.assignedAgentId);
+      }
     }
 
     this.emit('ticket:escalated', { ticketId });

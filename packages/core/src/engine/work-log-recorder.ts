@@ -15,49 +15,32 @@ export class WorkLogRecorder {
 
   /** Record when an agent starts a ticket */
   onTicketStarted(ticketId: string, agentId?: string): void {
-    this.workLogRepo.create({
-      id: randomUUID(),
-      date: today(),
-      agentId: agentId ?? null,
-      ticketId,
-      action: 'started',
-      description: `Started working on ticket ${ticketId}.`,
-    });
+    this.safeCreate(ticketId, agentId, 'started', `Started working on ticket ${ticketId}.`);
   }
 
   /** Record when a ticket is completed */
   onTicketCompleted(ticketId: string, agentId?: string): void {
-    this.workLogRepo.create({
-      id: randomUUID(),
-      date: today(),
-      agentId: agentId ?? null,
-      ticketId,
-      action: 'completed',
-      description: `Completed ticket ${ticketId}.`,
-    });
+    this.safeCreate(ticketId, agentId, 'completed', `Completed ticket ${ticketId}.`);
   }
 
   /** Record when a ticket fails */
   onTicketFailed(ticketId: string, agentId?: string, error?: string): void {
-    this.workLogRepo.create({
-      id: randomUUID(),
-      date: today(),
-      agentId: agentId ?? null,
-      ticketId,
-      action: 'blocked',
-      description: `Ticket ${ticketId} failed.${error ? ` Error: ${error}` : ''}`,
-    });
+    this.safeCreate(ticketId, agentId, 'blocked', `Ticket ${ticketId} failed.${error ? ` Error: ${error}` : ''}`);
   }
 
   /** Record progress update */
   onTicketProgress(ticketId: string, agentId?: string, description?: string): void {
-    this.workLogRepo.create({
-      id: randomUUID(),
-      date: today(),
-      agentId: agentId ?? null,
-      ticketId,
-      action: 'progressed',
-      description: description ?? `Progress on ticket ${ticketId}.`,
-    });
+    this.safeCreate(ticketId, agentId, 'progressed', description ?? `Progress on ticket ${ticketId}.`);
+  }
+
+  /** Observer should never crash the caller — swallow DB errors */
+  private safeCreate(ticketId: string, agentId: string | undefined, action: 'started' | 'progressed' | 'completed' | 'blocked', description: string): void {
+    try {
+      this.workLogRepo.create({
+        id: randomUUID(), date: today(), agentId: agentId ?? null, ticketId, action, description,
+      });
+    } catch {
+      // Work log creation failure is non-fatal for the engine
+    }
   }
 }

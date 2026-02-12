@@ -60,6 +60,9 @@ export class ContextManager {
             totalChars += JSON.stringify(item.input).length + item.name.length;
           } else if (item.type === 'tool_result') {
             totalChars += item.content.length;
+          } else {
+            // Unknown content type — estimate via serialization as safety fallback
+            totalChars += JSON.stringify(item).length;
           }
         }
       }

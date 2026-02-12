@@ -51,11 +51,13 @@ export class OrchestratorScheduler {
 
   /** Exposed for testing — run one tick manually */
   async tick(): Promise<void> {
-    if (this.processing) return; // re-entrancy guard
+    if (this.processing || !this.timer) return; // re-entrancy + stopped guard
     this.processing = true;
     try {
       this.currentTick = this.orchestrator.processQueue();
       await this.currentTick;
+    } catch {
+      // processQueue errors are non-fatal; will retry on next tick
     } finally {
       this.currentTick = null;
       this.processing = false;

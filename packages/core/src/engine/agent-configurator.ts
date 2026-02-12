@@ -52,7 +52,10 @@ export class AgentConfigurator {
    * Enhance an existing agent's metadata with ticket-specific specializations.
    */
   enhanceForTicket(agent: Agent, analysis: TicketAnalysis): void {
-    const existing = agent.metadata ? JSON.parse(agent.metadata) as Record<string, unknown> : {};
+    let existing: Record<string, unknown> = {};
+    try {
+      if (agent.metadata) existing = JSON.parse(agent.metadata) as Record<string, unknown>;
+    } catch { /* corrupted metadata, start fresh */ }
     const enhanced = {
       ...existing,
       currentSpecializations: analysis.specializations,

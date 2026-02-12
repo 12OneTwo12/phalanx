@@ -118,6 +118,23 @@ export const terminalExecTool: Tool<typeof schema> = {
       }
     }
 
+    // Enforce command allowlist via security policy or default config
+    if (context.securityPolicy) {
+      if (!context.securityPolicy.isCommandAllowed(params.command)) {
+        return {
+          success: false,
+          content: '',
+          error: 'Command blocked: not in the allowed commands list',
+        };
+      }
+    } else if (!isCommandAllowed(params.command, { allowlistMode: true })) {
+      return {
+        success: false,
+        content: '',
+        error: 'Command blocked: not in the allowed commands list',
+      };
+    }
+
     try {
       const timeoutMs = params.timeout ?? context.timeout ?? DEFAULT_TIMEOUT_MS;
 
