@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { Ticket } from '@phalanx/core';
 import { apiPatch } from '@/lib/api-client';
 import { mutate } from 'swr';
@@ -52,7 +53,9 @@ export function KanbanCard({ ticket }: KanbanCardProps) {
       <div className="flex items-start gap-2">
         <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOTS[ticket.priority] ?? 'bg-gray-500'}`} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium leading-tight">{ticket.title}</p>
+          <Link href={`/tickets/${ticket.id}`} className="text-sm font-medium leading-tight hover:text-blue-400">
+            {ticket.title}
+          </Link>
           {ticket.assignedAgentId && (
             <p className="mt-1 text-xs text-gray-500">Agent: {ticket.assignedAgentId}</p>
           )}
