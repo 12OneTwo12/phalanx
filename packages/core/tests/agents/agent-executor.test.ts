@@ -425,5 +425,39 @@ describe('AgentExecutor', () => {
       expect(callArgs.systemPrompt).not.toContain('# Skills');
       expect(callArgs.systemPrompt).not.toContain('# Memory');
     });
+
+    it('includes conventions in system prompt when provided', async () => {
+      const provider = makeMockProvider([
+        makeToolCallResult({ stopReason: 'end_turn', content: 'Done.' }),
+      ]);
+      const executor = new AgentExecutor(provider, registry);
+      const config = makeConfig({
+        conventions: '## Naming\nUse kebab-case for files.\n## Style\nNo console.log.',
+      });
+
+      await executor.run(config, 'Task');
+
+      const chatWithTools = provider.chatWithTools as ReturnType<typeof vi.fn>;
+      const callArgs = chatWithTools.mock.calls[0][0] as ChatWithToolsParams;
+
+      expect(callArgs.systemPrompt).toContain('# Project Conventions');
+      expect(callArgs.systemPrompt).toContain('Use kebab-case for files.');
+      expect(callArgs.systemPrompt).toContain('No console.log.');
+    });
+
+    it('omits conventions section when not provided', async () => {
+      const provider = makeMockProvider([
+        makeToolCallResult({ stopReason: 'end_turn', content: 'Done.' }),
+      ]);
+      const executor = new AgentExecutor(provider, registry);
+      const config = makeConfig();
+
+      await executor.run(config, 'Task');
+
+      const chatWithTools = provider.chatWithTools as ReturnType<typeof vi.fn>;
+      const callArgs = chatWithTools.mock.calls[0][0] as ChatWithToolsParams;
+
+      expect(callArgs.systemPrompt).not.toContain('# Project Conventions');
+    });
   });
 });

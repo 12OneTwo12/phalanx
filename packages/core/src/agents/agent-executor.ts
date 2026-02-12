@@ -244,6 +244,9 @@ export class AgentExecutor {
     if (config.soul.memory) {
       sections.push(`# Memory\n\n${config.soul.memory}`);
     }
+    if (config.conventions) {
+      sections.push(`# Project Conventions\n\n${config.conventions}`);
+    }
 
     return sections.join('\n\n---\n\n');
   }

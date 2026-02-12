@@ -43,6 +43,8 @@ export interface AgentConfig {
   maxIterations: number;
   temperature?: number;
   thinkingLevel?: ThinkingLevel;
+  /** Project conventions to inject into agent system prompt */
+  conventions?: string;
 }
 
 // ---------------------------------------------------------------------------

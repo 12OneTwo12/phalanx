@@ -14,6 +14,7 @@ export {
   type AgentTicketExecutorConfig,
   type AgentConfigResolver,
 } from './agent-ticket-executor.js';
+export { injectConventions } from './convention-injector.js';
 export * from './verification/index.js';
 export * from './pr/index.js';
 export {
