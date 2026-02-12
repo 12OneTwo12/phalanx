@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, readFileSync, rmSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { syncConventionToDisk, syncAllConventionsToDisk } from '../convention-sync';
+import { syncConventionToDisk, syncAllConventionsToDisk, findProjectRoot } from '../convention-sync';
 
 describe('convention-sync', () => {
   let testDir: string;
@@ -50,6 +50,25 @@ describe('convention-sync', () => {
       syncConventionToDisk('conventions', 'v2', testDir);
       const path = resolve(testDir, '.phalanx', 'CONVENTIONS.md');
       expect(readFileSync(path, 'utf-8')).toBe('v2');
+    });
+  });
+
+  describe('findProjectRoot', () => {
+    it('finds root by .phalanx/config.json marker', () => {
+      // Create a nested structure: testDir/.phalanx/config.json and testDir/packages/dashboard
+      const phalanxDir = resolve(testDir, '.phalanx');
+      mkdirSync(phalanxDir, { recursive: true });
+      writeFileSync(resolve(phalanxDir, 'config.json'), '{}', 'utf-8');
+      const nestedDir = resolve(testDir, 'packages', 'dashboard');
+      mkdirSync(nestedDir, { recursive: true });
+      expect(findProjectRoot(nestedDir)).toBe(testDir);
+    });
+
+    it('returns startDir when no marker found', () => {
+      const isolated = resolve(testDir, 'no-marker');
+      mkdirSync(isolated, { recursive: true });
+      // No .git or .phalanx above, so it returns the starting directory
+      expect(findProjectRoot(isolated)).toBe(isolated);
     });
   });
 

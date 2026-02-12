@@ -91,7 +91,7 @@ export class BranchManager {
       throw new Error('Ticket ID cannot be empty');
     }
 
-    const normalizedSlug = this.normalizeSlug(slug);
+    const normalizedSlug = this.normalizeSlug(slug, ticketId);
     const branchName = `${BRANCH_PREFIX}${ticketId}-${normalizedSlug}`;
 
     if (branchName.length > MAX_BRANCH_LENGTH) {
@@ -103,22 +103,30 @@ export class BranchManager {
 
   /**
    * Normalize a string into a valid slug for branch naming.
+   * Handles special characters (including URL chars like /, ?, &, =)
+   * and provides a fallback for inputs that produce no alphanumeric content.
    */
-  private normalizeSlug(input: string): string {
+  normalizeSlug(input: string, ticketId?: string): string {
     if (!input || input.trim().length === 0) {
       throw new Error('Slug cannot be empty');
     }
 
     const slug = input
       .toLowerCase()
+      .replace(/\//g, '-')    // Replace slashes explicitly for URL-like strings
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 50);
 
-    if (!slug || !SLUG_PATTERN.test(slug)) {
-      throw new Error(`Cannot create valid slug from input: "${input}"`);
+    if (slug && SLUG_PATTERN.test(slug)) {
+      return slug;
     }
 
-    return slug;
+    // Fallback: use ticketId prefix if available, otherwise throw
+    if (ticketId) {
+      return `task-${ticketId.slice(0, 8)}`;
+    }
+
+    throw new Error(`Cannot create valid slug from input: "${input}"`);
   }
 }

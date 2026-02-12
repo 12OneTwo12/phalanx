@@ -11,7 +11,26 @@
  *   - 'style'        → .phalanx/STYLE.md
  */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
+
+/**
+ * Walk up the directory tree to find the project root.
+ * Looks for `.phalanx/config.json` or `.git/` as markers.
+ * Falls back to the starting directory if no marker is found.
+ */
+export function findProjectRoot(startDir: string): string {
+  let dir = resolve(startDir);
+  const root = dirname(dir) === dir ? dir : '/'; // filesystem root guard
+  while (dir !== root) {
+    if (existsSync(resolve(dir, '.phalanx', 'config.json')) || existsSync(resolve(dir, '.git'))) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return startDir;
+}
 
 /** Convention type → filename mapping */
 const TYPE_FILE_MAP: Record<string, string> = {
@@ -34,7 +53,7 @@ export function syncConventionToDisk(
   const filename = TYPE_FILE_MAP[type];
   if (!filename) return null;
 
-  const root = projectRoot ?? process.env.PHALANX_PROJECT_ROOT ?? process.cwd();
+  const root = projectRoot ?? process.env.PHALANX_PROJECT_ROOT ?? findProjectRoot(process.cwd());
   const conventionDir = resolve(root, '.phalanx');
   const filePath = resolve(conventionDir, filename);
 

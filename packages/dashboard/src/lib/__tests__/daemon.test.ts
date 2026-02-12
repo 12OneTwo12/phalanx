@@ -114,6 +114,7 @@ vi.mock('@phalanx/core', async () => {
     AgentExecutor: MockAgentExecutor,
     ToolRegistry: MockToolRegistry,
     HeartbeatService: MockHeartbeatService,
+    MemoryUpdateHook: vi.fn(),
     BUILTIN_TOOLS: [],
     injectConventions: vi.fn((config: Record<string, unknown>) => config),
     createLLMStack: vi.fn(() => ({

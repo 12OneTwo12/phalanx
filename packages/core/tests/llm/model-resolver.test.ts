@@ -150,7 +150,7 @@ describe('ModelResolver', () => {
   it('step 1: resolves ticket override first', () => {
     const ctx: ModelResolutionContext = {
       ticketModel: 'openai/gpt-4o',
-      agentModel: 'anthropic/claude-opus-4-6-20250414',
+      agentModel: 'anthropic/claude-opus-4-20250514',
       systemDefault: 'anthropic/claude-sonnet-4-5-20250929',
     };
     const result = resolver.resolve(ctx);
@@ -160,12 +160,12 @@ describe('ModelResolver', () => {
 
   it('step 2: falls to agent model when no ticket', () => {
     const ctx: ModelResolutionContext = {
-      agentModel: 'anthropic/claude-opus-4-6-20250414',
+      agentModel: 'anthropic/claude-opus-4-20250514',
       systemDefault: 'anthropic/claude-sonnet-4-5-20250929',
     };
     const result = resolver.resolve(ctx);
     expect(result.resolvedFrom).toBe('agent');
-    expect(result.fullId).toBe('anthropic/claude-opus-4-6-20250414');
+    expect(result.fullId).toBe('anthropic/claude-opus-4-20250514');
   });
 
   it('step 3: falls to role default', () => {

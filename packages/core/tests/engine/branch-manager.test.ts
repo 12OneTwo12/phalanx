@@ -39,8 +39,16 @@ describe('BranchManager', () => {
       expect(() => manager.buildBranchName('t1', '')).toThrow('Slug cannot be empty');
     });
 
-    it('should throw for slug that produces only invalid chars', () => {
-      expect(() => manager.buildBranchName('t1', '!!!')).toThrow('Cannot create valid slug');
+    it('should fallback to ticketId-based slug for invalid chars', () => {
+      expect(manager.buildBranchName('t1abcdef', '!!!')).toBe('ticket/t1abcdef-task-t1abcdef');
+    });
+
+    it('should handle URL-like slugs (e.g. GET /api/v1/tasks)', () => {
+      expect(manager.buildBranchName('t1', 'GET /api/v1/tasks')).toBe('ticket/t1-get-api-v1-tasks');
+    });
+
+    it('should handle slugs with query params', () => {
+      expect(manager.buildBranchName('t1', 'GET /api?foo=bar&baz=1')).toBe('ticket/t1-get-api-foo-bar-baz-1');
     });
 
     it('should throw for branch name exceeding max length', () => {
