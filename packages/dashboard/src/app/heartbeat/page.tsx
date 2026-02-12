@@ -4,6 +4,19 @@ import useSWR, { mutate } from 'swr';
 import { fetcher, apiPatch } from '@/lib/api-client';
 import type { HeartbeatLog, Proposal } from '@phalanx/core';
 
+function formatReport(raw: string): { summary?: string; suggestions?: string[]; parsed: boolean } {
+  try {
+    const obj = JSON.parse(raw);
+    return {
+      summary: obj.summary ?? obj.message,
+      suggestions: Array.isArray(obj.suggestions) ? obj.suggestions : undefined,
+      parsed: true,
+    };
+  } catch {
+    return { parsed: false };
+  }
+}
+
 export default function HeartbeatPage() {
   const { data: heartbeats, isLoading: loadingHb } = useSWR<HeartbeatLog[]>('/api/heartbeat', fetcher);
   const { data: proposals, isLoading: loadingPr } = useSWR<Proposal[]>('/api/proposals', fetcher);
@@ -83,9 +96,28 @@ export default function HeartbeatPage() {
                   <span className="text-gray-500">Every {hb.interval} min</span>
                   <span className="text-gray-600">{hb.createdAt}</span>
                 </div>
-                <pre className="mt-2 max-h-40 overflow-auto rounded bg-gray-800 p-2 text-xs text-gray-300">
-                  {hb.report}
-                </pre>
+                {(() => {
+                  const r = formatReport(hb.report);
+                  if (!r.parsed) {
+                    return (
+                      <pre className="mt-2 max-h-40 overflow-auto rounded bg-gray-800 p-2 text-xs text-gray-300">
+                        {hb.report}
+                      </pre>
+                    );
+                  }
+                  return (
+                    <div className="mt-2 rounded bg-gray-800 p-3 text-sm">
+                      {r.summary && <p className="text-gray-200">{r.summary}</p>}
+                      {r.suggestions && r.suggestions.length > 0 && (
+                        <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-gray-400">
+                          {r.suggestions.map((s, i) => (
+                            <li key={i}>{s}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
