@@ -80,11 +80,11 @@ export default function GoalsPage() {
                   </div>
                 </div>
                 <div className="ml-4 text-right">
-                  <div className="text-lg font-bold">{Math.round(goal.progress * 100)}%</div>
+                  <div className="text-lg font-bold">{Math.round(goal.progress)}%</div>
                   <div className="mt-1 h-1.5 w-20 overflow-hidden rounded-full bg-gray-800">
                     <div
                       className="h-full rounded-full bg-blue-500"
-                      style={{ width: `${goal.progress * 100}%` }}
+                      style={{ width: `${goal.progress}%` }}
                     />
                   </div>
                 </div>

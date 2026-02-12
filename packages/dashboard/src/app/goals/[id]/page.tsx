@@ -91,7 +91,7 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
       <div className="mb-6 flex items-center gap-4 text-sm text-gray-400">
         <span>
           Status: <span className="font-medium text-gray-200">{goal.status}</span> · Progress:{' '}
-          <span className="font-medium text-gray-200">{Math.round(goal.progress * 100)}%</span>
+          <span className="font-medium text-gray-200">{Math.round(goal.progress)}%</span>
         </span>
         {goal.epics.length === 0 && (
           <button

@@ -14,12 +14,17 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
   const epicRepo = getEpicRepository();
   const ticketRepo = getTicketRepository();
-  const epics = epicRepo.findByGoalId(id).map((epic) => ({
-    ...epic,
-    tickets: ticketRepo.findByEpicId(epic.id),
-  }));
+  let totalTickets = 0;
+  let doneTickets = 0;
+  const epics = epicRepo.findByGoalId(id).map((epic) => {
+    const tickets = ticketRepo.findByEpicId(epic.id);
+    totalTickets += tickets.length;
+    doneTickets += tickets.filter((t) => t.status === 'done').length;
+    return { ...epic, tickets };
+  });
+  const progress = totalTickets === 0 ? 0 : Math.round((doneTickets / totalTickets) * 100);
 
-  return jsonResponse({ ...goal, epics });
+  return jsonResponse({ ...goal, progress, epics });
 }
 
 /** Allowed fields for goal PATCH updates */

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getGoalRepository, getEpicRepository } from '@/lib/db';
+import { getGoalRepository, getEpicRepository, getTicketRepository } from '@/lib/db';
 import { jsonResponse, errorResponse, newId, parseBody } from '@/lib/api-utils';
 import type { NewGoal } from '@phalanx/core';
 
@@ -11,12 +11,25 @@ export async function GET(request: NextRequest) {
 
   const goals = status ? repo.findByStatus(status) : repo.findAll();
 
-  // Attach epic counts
+  // Attach epic counts and calculate live progress
   const epicRepo = getEpicRepository();
-  const enriched = goals.map((goal) => ({
-    ...goal,
-    epicCount: epicRepo.findByGoalId(goal.id).length,
-  }));
+  const ticketRepo = getTicketRepository();
+  const enriched = goals.map((goal) => {
+    const epics = epicRepo.findByGoalId(goal.id);
+    let totalTickets = 0;
+    let doneTickets = 0;
+    for (const epic of epics) {
+      const tickets = ticketRepo.findByEpicId(epic.id);
+      totalTickets += tickets.length;
+      doneTickets += tickets.filter((t) => t.status === 'done').length;
+    }
+    const progress = totalTickets === 0 ? 0 : Math.round((doneTickets / totalTickets) * 100);
+    return {
+      ...goal,
+      progress,
+      epicCount: epics.length,
+    };
+  });
 
   return jsonResponse(enriched);
 }

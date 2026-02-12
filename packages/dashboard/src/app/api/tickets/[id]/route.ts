@@ -1,4 +1,4 @@
-import { getTicketRepository } from '@/lib/db';
+import { getTicketRepository, getEpicRepository, getGoalRepository } from '@/lib/db';
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-utils';
 
 interface RouteParams {
@@ -40,6 +40,26 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const updated = repo.update(id, sanitized);
     if (!updated) return errorResponse('Ticket not found', 404);
+
+    // Recalculate goal progress when ticket status changes
+    if ('status' in sanitized && updated.epicId) {
+      const epicRepo = getEpicRepository();
+      const epic = epicRepo.findById(updated.epicId);
+      if (epic?.goalId) {
+        const epics = epicRepo.findByGoalId(epic.goalId);
+        let totalTickets = 0;
+        let doneTickets = 0;
+        for (const e of epics) {
+          const tickets = repo.findByEpicId(e.id);
+          totalTickets += tickets.length;
+          doneTickets += tickets.filter((t) => t.status === 'done').length;
+        }
+        const progress = totalTickets === 0 ? 0 : Math.round((doneTickets / totalTickets) * 100);
+        const goalRepo = getGoalRepository();
+        goalRepo.update(epic.goalId, { progress });
+      }
+    }
+
     return jsonResponse(updated);
   } catch {
     return errorResponse('Failed to update ticket', 500);
