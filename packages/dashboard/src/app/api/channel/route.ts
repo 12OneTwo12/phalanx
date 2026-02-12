@@ -2,13 +2,10 @@ import { jsonResponse, errorResponse, newId, parseBody } from '@/lib/api-utils';
 import {
   getActivityLogRepository,
   getChannelMessageRepository,
-  getGoalRepository,
-  getAgentRepository,
-  getTicketRepository,
 } from '@/lib/db';
 import { getLLMProvider } from '@/lib/llm-provider';
 import { eventBus } from '@/lib/event-bus';
-import { TeamLeadChatService, type ChatMessage, type ProjectContext } from '@phalanx/core';
+import { createTeamLeadAgent, type ChatMessage } from '@/lib/team-lead-agent';
 import type { ChannelMessage } from '@phalanx/core';
 
 export type { ChannelMessage };
@@ -23,7 +20,7 @@ export async function GET(request: Request) {
   return jsonResponse(messages);
 }
 
-/** POST /api/channel — send a message and get Team Lead LLM response */
+/** POST /api/channel — send a message and get Team Lead agent response */
 export async function POST(request: Request) {
   const body = await parseBody<{ content: string; role?: 'user' | 'team-lead' }>(request);
   if (!body?.content?.trim()) {
@@ -48,7 +45,7 @@ export async function POST(request: Request) {
   // Broadcast user message via SSE
   eventBus.emit('channel:message', { messageId: userMessage.id, role: userMessage.role });
 
-  // If the message is from user, generate Team Lead LLM response
+  // If the message is from user, generate Team Lead agent response
   if (userMessage.role === 'user') {
     const teamLeadReply = await generateTeamLeadResponse(repo);
     if (teamLeadReply) {
@@ -60,13 +57,12 @@ export async function POST(request: Request) {
 }
 
 // ---------------------------------------------------------------------------
-// Team Lead LLM response generation
+// Team Lead agent response generation
 // ---------------------------------------------------------------------------
 
 async function generateTeamLeadResponse(
   repo: ReturnType<typeof getChannelMessageRepository>,
 ) {
-  // Get configured LLM provider from credential store + project config
   const llm = getLLMProvider();
   if (!llm) {
     const notice = repo.create({
@@ -86,23 +82,29 @@ async function generateTeamLeadResponse(
       content: m.content,
     }));
 
-    // Load project context
-    const context = buildProjectContext();
-
-    // Generate response using the configured provider and model
-    const service = new TeamLeadChatService(llm.provider, { model: llm.model });
-    const responseText = await service.respond(chatHistory, context);
+    // Run the agentic Team Lead (with tool use)
+    const agent = createTeamLeadAgent(llm.provider, llm.model);
+    const result = await agent.run(chatHistory);
 
     // Save Team Lead response
     const teamLeadMessage = repo.create({
       id: newId(),
       role: 'team-lead',
-      content: responseText,
+      content: result.finalContent,
+      metadata: JSON.stringify({
+        status: result.status,
+        iterations: result.iterations,
+        toolCallCount: result.toolCallCount,
+        usage: result.totalUsage,
+      }),
     });
 
     // Log and broadcast
-    logActivity('channel:message from team-lead', {
+    logActivity('channel:agent-response', {
       messageId: teamLeadMessage.id,
+      status: result.status,
+      iterations: result.iterations,
+      toolCallCount: result.toolCallCount,
       preview: teamLeadMessage.content.slice(0, 100),
     });
     eventBus.emit('channel:message', {
@@ -120,32 +122,6 @@ async function generateTeamLeadResponse(
     });
     eventBus.emit('channel:message', { messageId: notice.id, role: notice.role });
     return notice;
-  }
-}
-
-function buildProjectContext(): ProjectContext {
-  try {
-    const goals = getGoalRepository().findAll({ limit: 10, offset: 0 });
-    const agents = getAgentRepository().findAll({ limit: 20, offset: 0 });
-    const tickets = getTicketRepository().findAll({ limit: 100, offset: 0 });
-    const activeTicketCount = tickets.filter(
-      t => t.status !== 'done',
-    ).length;
-
-    return {
-      goals: goals.map(g => ({
-        description: g.description,
-        status: g.status,
-      })),
-      agents: agents.map(a => ({
-        name: a.name,
-        role: a.role,
-        status: a.status,
-      })),
-      activeTicketCount,
-    };
-  } catch {
-    return {};
   }
 }
 

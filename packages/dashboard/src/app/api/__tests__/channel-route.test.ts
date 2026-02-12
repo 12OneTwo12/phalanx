@@ -35,18 +35,27 @@ vi.mock('@/lib/event-bus', () => ({
   eventBus: { emit: vi.fn() },
 }));
 
-const mockChat = vi.fn().mockResolvedValue({
-  content: 'Team Lead response',
-  usage: { inputTokens: 50, outputTokens: 100 },
-  model: 'mock-model',
+const mockAgentRun = vi.fn().mockResolvedValue({
+  status: 'completed',
+  finalContent: 'Team Lead response',
+  conversationHistory: [],
+  iterations: 1,
+  toolCallCount: 0,
+  totalUsage: { inputTokens: 50, outputTokens: 100 },
 });
+
+vi.mock('@/lib/team-lead-agent', () => ({
+  createTeamLeadAgent: vi.fn(() => ({
+    run: mockAgentRun,
+  })),
+}));
 
 vi.mock('@/lib/llm-provider', () => ({
   getLLMProvider: vi.fn(() => ({
     provider: {
       name: 'mock',
       models: ['mock-model'],
-      chat: mockChat,
+      chat: vi.fn(),
       chatWithTools: vi.fn(),
       isAvailable: vi.fn().mockResolvedValue(true),
     },
@@ -121,7 +130,7 @@ describe('POST /api/channel', () => {
     expect(body.teamLeadMessage).toBeUndefined();
   });
 
-  it('should call LLM with channel history', async () => {
+  it('should call agent with channel history', async () => {
     mockMessages.push({
       id: 'prev-1',
       role: 'user',
@@ -137,7 +146,7 @@ describe('POST /api/channel', () => {
     });
 
     await POST(req);
-    expect(mockChat).toHaveBeenCalledOnce();
+    expect(mockAgentRun).toHaveBeenCalledOnce();
   });
 
   it('should show config message when no provider is available', async () => {
@@ -155,5 +164,22 @@ describe('POST /api/channel', () => {
 
     expect(res.status).toBe(201);
     expect(body.teamLeadMessage.content).toContain('phalanx init');
+  });
+
+  it('should include agent metadata in response', async () => {
+    const req = new Request('http://localhost/api/channel', {
+      method: 'POST',
+      body: JSON.stringify({ content: 'Hello team' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(body.teamLeadMessage.metadata).toBeDefined();
+    const meta = JSON.parse(body.teamLeadMessage.metadata);
+    expect(meta.status).toBe('completed');
+    expect(meta.iterations).toBe(1);
+    expect(meta.toolCallCount).toBe(0);
   });
 });
