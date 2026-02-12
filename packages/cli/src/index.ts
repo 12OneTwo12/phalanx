@@ -9,6 +9,7 @@ import { startCommand } from './commands/start.js';
 import { stopCommand } from './commands/stop.js';
 import { statusCommand } from './commands/status.js';
 import { goalCommand } from './commands/goal.js';
+import { configCommand } from './commands/config.js';
 
 const program = new Command()
   .name('phalanx')
@@ -20,5 +21,6 @@ program.addCommand(startCommand);
 program.addCommand(stopCommand);
 program.addCommand(statusCommand);
 program.addCommand(goalCommand);
+program.addCommand(configCommand);
 
 program.parse();

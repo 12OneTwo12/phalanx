@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { initConfig, loadConfig, findProjectRoot } from '../src/utils/config-loader.js';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { initConfig, loadConfig, saveConfig, findProjectRoot } from '../src/utils/config-loader.js';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -24,6 +24,16 @@ describe('config-loader', () => {
       expect(config.projectRoot).toBe(tempDir);
       expect(config.dashboardPort).toBe(3000);
     });
+
+    it('should include default llm and daemon settings', () => {
+      const config = initConfig(tempDir);
+
+      expect(config.llm).toEqual({
+        systemDefault: 'anthropic/claude-sonnet-4-5-20250929',
+        providers: {},
+      });
+      expect(config.daemon).toEqual({ autoStart: false });
+    });
   });
 
   describe('loadConfig', () => {
@@ -38,6 +48,27 @@ describe('config-loader', () => {
       expect(config).not.toBeNull();
       expect(config!.projectRoot).toBe(tempDir);
     });
+
+    it('should load llm and daemon fields', () => {
+      initConfig(tempDir);
+      const config = loadConfig(tempDir)!;
+      expect(config.llm.systemDefault).toBe('anthropic/claude-sonnet-4-5-20250929');
+      expect(config.llm.providers).toEqual({});
+      expect(config.daemon.autoStart).toBe(false);
+    });
+
+    it('should default missing llm/daemon fields gracefully', () => {
+      // Write a config without llm/daemon (simulating old config)
+      const configDir = join(tempDir, '.phalanx');
+      const { mkdirSync, writeFileSync } = require('node:fs');
+      mkdirSync(configDir, { recursive: true });
+      writeFileSync(join(configDir, 'config.json'), JSON.stringify({ dbPath: '.phalanx/test.db' }));
+
+      const config = loadConfig(tempDir)!;
+      expect(config.dbPath).toBe('.phalanx/test.db');
+      expect(config.llm.systemDefault).toBe('anthropic/claude-sonnet-4-5-20250929');
+      expect(config.daemon.autoStart).toBe(false);
+    });
   });
 
   describe('findProjectRoot', () => {
@@ -50,6 +81,36 @@ describe('config-loader', () => {
       initConfig(tempDir);
       const result = findProjectRoot(tempDir);
       expect(result).toBe(tempDir);
+    });
+  });
+
+  describe('saveConfig', () => {
+    it('should persist llm providers and daemon settings', () => {
+      const config = initConfig(tempDir);
+      config.llm.providers = {
+        anthropic: { enabled: true },
+        ollama: { enabled: true, baseUrl: 'http://localhost:11434' },
+      };
+      config.llm.systemDefault = 'openai/gpt-4o';
+      config.daemon.autoStart = true;
+
+      saveConfig(config);
+
+      const raw = readFileSync(join(tempDir, '.phalanx/config.json'), 'utf-8');
+      const parsed = JSON.parse(raw);
+      expect(parsed.llm.systemDefault).toBe('openai/gpt-4o');
+      expect(parsed.llm.providers.anthropic.enabled).toBe(true);
+      expect(parsed.llm.providers.ollama.baseUrl).toBe('http://localhost:11434');
+      expect(parsed.daemon.autoStart).toBe(true);
+    });
+
+    it('should not persist projectRoot', () => {
+      const config = initConfig(tempDir);
+      saveConfig(config);
+
+      const raw = readFileSync(join(tempDir, '.phalanx/config.json'), 'utf-8');
+      const parsed = JSON.parse(raw);
+      expect(parsed.projectRoot).toBeUndefined();
     });
   });
 });
