@@ -2,8 +2,9 @@
 
 import { use, useState } from 'react';
 import useSWR from 'swr';
-import { fetcher, apiPost } from '@/lib/api-client';
+import { fetcher, apiPost, apiPatch } from '@/lib/api-client';
 import { useEventStream } from '@/hooks/use-event-stream';
+import { useAgentNames } from '@/hooks/use-agent-names';
 import Link from 'next/link';
 
 interface Ticket {
@@ -57,7 +58,7 @@ const COMMENT_TYPE_ICONS: Record<string, string> = {
 
 export default function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data: ticket, isLoading } = useSWR<Ticket>(`/api/tickets/${id}`, fetcher);
+  const { data: ticket, isLoading, mutate: refreshTicket } = useSWR<Ticket>(`/api/tickets/${id}`, fetcher);
   const { data: comments, mutate: refreshComments } = useSWR<TicketComment[]>(
     `/api/tickets/${id}/comments`,
     fetcher,
@@ -65,6 +66,21 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const [newComment, setNewComment] = useState('');
   const [commentType, setCommentType] = useState('comment');
   const [sending, setSending] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const agentNames = useAgentNames();
+
+  const handleStatusAction = async (status: string) => {
+    setActionLoading(true);
+    try {
+      const body = status === 'backlog'
+        ? { status, approvedAt: new Date().toISOString() }
+        : { status };
+      await apiPatch(`/tickets/${id}`, body);
+      await refreshTicket();
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   useEventStream({
     filterPrefix: 'ticket:',
@@ -107,15 +123,47 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             {ticket.priority}
           </span>
           {ticket.assignedAgentId && (
-            <span className="text-gray-400">Agent: {ticket.assignedAgentId}</span>
+            <Link href={`/agents/${ticket.assignedAgentId}`} className="text-gray-400 hover:text-blue-400">
+              Agent: {agentNames.get(ticket.assignedAgentId) ?? ticket.assignedAgentId}
+            </Link>
           )}
           {ticket.branch && (
             <span className="font-mono text-xs text-gray-500">{ticket.branch}</span>
           )}
           {ticket.prUrl && (
-            <span className="text-blue-400">{ticket.prUrl}</span>
+            <a href={ticket.prUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+              {ticket.prUrl}
+            </a>
+          )}
+          <span className="text-xs text-gray-500">
+            Created: {new Date(ticket.createdAt).toLocaleString()}
+          </span>
+          {ticket.updatedAt !== ticket.createdAt && (
+            <span className="text-xs text-gray-500">
+              Updated: {new Date(ticket.updatedAt).toLocaleString()}
+            </span>
           )}
         </div>
+
+        {/* Approve/Reject actions for pending tickets */}
+        {ticket.status === 'pending_approval' && (
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() => handleStatusAction('backlog')}
+              disabled={actionLoading}
+              className="rounded-md bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-500 disabled:opacity-50"
+            >
+              {actionLoading ? 'Processing...' : 'Approve Ticket'}
+            </button>
+            <button
+              onClick={() => handleStatusAction('failed')}
+              disabled={actionLoading}
+              className="rounded-md bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+            >
+              Reject
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Description */}
