@@ -1,27 +1,12 @@
 /**
  * WorkspaceGuard — enforces agent workspace isolation.
  *
- * Ensures agents can only access files within their designated workspace
- * and cannot traverse out via `../` or symlinks.
+ * Delegates path safety and sensitive file detection to `path-utils.ts`
+ * to avoid duplicated security logic. This class provides a convenient
+ * object-oriented wrapper with custom error types.
  */
 import * as path from 'node:path';
-import * as fs from 'node:fs/promises';
-
-// ---------------------------------------------------------------------------
-// Default blocked patterns (basenames that are always blocked)
-// ---------------------------------------------------------------------------
-
-const DEFAULT_BLOCKED_PATTERNS = [
-  '.env',
-  '.env.local',
-  '.env.production',
-  '.ssh',
-  '*.pem',
-  '*.key',
-  'credentials.*',
-  'id_rsa',
-  'id_ed25519',
-];
+import { resolveSafePath, isSensitivePath } from './builtin/path-utils.js';
 
 // ---------------------------------------------------------------------------
 // WorkspaceGuard
@@ -29,41 +14,34 @@ const DEFAULT_BLOCKED_PATTERNS = [
 
 export class WorkspaceGuard {
   private readonly rootDir: string;
-  private readonly blockedPatterns: string[];
+  private readonly additionalBlocked: string[];
 
   constructor(rootDir: string, additionalBlocked?: string[]) {
     this.rootDir = path.resolve(rootDir);
-    this.blockedPatterns = [...DEFAULT_BLOCKED_PATTERNS, ...(additionalBlocked ?? [])];
+    this.additionalBlocked = additionalBlocked ?? [];
   }
 
   /**
    * Resolve a relative path within the workspace, preventing directory traversal.
-   * Throws if the resolved path escapes the workspace root.
+   * Throws if the resolved path escapes the workspace root or is a sensitive file.
+   *
+   * Uses `resolveSafePath` (which handles symlinks) and `isSensitivePath`
+   * (which handles case-insensitive matching) from path-utils.
    */
   async resolveSafe(relativePath: string): Promise<string> {
-    const resolved = path.resolve(this.rootDir, relativePath);
-
-    // Check for directory traversal
-    if (!resolved.startsWith(this.rootDir + path.sep) && resolved !== this.rootDir) {
-      throw new WorkspaceEscapeError(relativePath, this.rootDir);
-    }
-
-    // Check for blocked patterns
-    if (this.isBlocked(resolved)) {
+    // Check sensitive path first (case-insensitive, covers .env, .ssh, *.pem, etc.)
+    if (isSensitivePath(relativePath, this.additionalBlocked)) {
       throw new BlockedPathError(relativePath);
     }
 
-    // Resolve symlinks and re-check
-    try {
-      const realPath = await fs.realpath(resolved);
-      if (!realPath.startsWith(this.rootDir + path.sep) && realPath !== this.rootDir) {
-        throw new WorkspaceEscapeError(relativePath, this.rootDir);
-      }
-    } catch (err) {
-      // File doesn't exist yet — that's fine for write operations
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw err;
-      }
+    const resolved = await resolveSafePath(relativePath, this.rootDir);
+    if (!resolved) {
+      throw new WorkspaceEscapeError(relativePath, this.rootDir);
+    }
+
+    // Re-check the resolved path (in case symlink resolves to a sensitive file)
+    if (isSensitivePath(resolved, this.additionalBlocked)) {
+      throw new BlockedPathError(relativePath);
     }
 
     return resolved;
@@ -71,35 +49,20 @@ export class WorkspaceGuard {
 
   /**
    * Check if an absolute path is within the workspace and not blocked.
+   * Note: This is a synchronous check and does NOT resolve symlinks.
+   * For full symlink safety, use `resolveSafe()` instead.
    */
   isAllowed(absolutePath: string): boolean {
     const resolved = path.resolve(absolutePath);
     if (!resolved.startsWith(this.rootDir + path.sep) && resolved !== this.rootDir) {
       return false;
     }
-    return !this.isBlocked(resolved);
+    return !isSensitivePath(resolved, this.additionalBlocked);
   }
 
   /** Get the root directory */
   get root(): string {
     return this.rootDir;
-  }
-
-  private isBlocked(absolutePath: string): boolean {
-    const basename = path.basename(absolutePath);
-    return this.blockedPatterns.some((pattern) => {
-      if (pattern.startsWith('*')) {
-        return basename.endsWith(pattern.slice(1));
-      }
-      if (pattern.endsWith('*')) {
-        return basename.startsWith(pattern.slice(0, -1));
-      }
-      if (pattern.endsWith('.*')) {
-        const prefix = pattern.slice(0, -2);
-        return basename.startsWith(prefix + '.');
-      }
-      return basename === pattern;
-    });
   }
 }
 

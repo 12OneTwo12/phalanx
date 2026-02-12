@@ -68,7 +68,7 @@ export class SmartAssignmentService {
     const selectedModel = this.modelSelector.select(analysis);
 
     // Step 3: Find existing idle agent or create new one
-    const role = analysis.requiredRole as AgentRole;
+    const role = this.toAgentRole(analysis.requiredRole);
     const candidates = this.agentRepo.findByRole(role).filter((a) => a.status === 'idle');
 
     let agentId: string;
@@ -140,6 +140,17 @@ export class SmartAssignmentService {
     }
 
     return this.fallbackAnalysis(title, description, priority);
+  }
+
+  /** Map a Zod-validated role string to AgentRole. Defaults to 'backend'. */
+  private toAgentRole(role: string): AgentRole {
+    const validRoles: Record<string, AgentRole> = {
+      backend: 'backend' as AgentRole,
+      frontend: 'frontend' as AgentRole,
+      qa: 'qa' as AgentRole,
+      devops: 'devops' as AgentRole,
+    };
+    return validRoles[role] ?? ('backend' as AgentRole);
   }
 
   private fallbackAnalysis(title: string, description: string, priority: string): TicketAnalysis {

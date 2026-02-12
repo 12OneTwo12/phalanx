@@ -109,13 +109,17 @@ export class ContextManager {
       const msg = result[i];
       if (typeof msg.content !== 'string' && Array.isArray(msg.content)) {
         const before = this.estimateMessageTokens(msg);
-        msg.content = msg.content.map((item) => {
-          if (item.type === 'tool_result' && item.content.length > 200) {
-            return { ...item, content: '[pruned — tool output truncated]' };
-          }
-          return item;
-        });
-        const after = this.estimateMessageTokens(msg);
+        // Create a new message object to avoid mutating the original
+        result[i] = {
+          ...msg,
+          content: msg.content.map((item) => {
+            if (item.type === 'tool_result' && item.content.length > 200) {
+              return { ...item, content: '[pruned — tool output truncated]' };
+            }
+            return item;
+          }),
+        };
+        const after = this.estimateMessageTokens(result[i]);
         current -= (before - after);
       }
     }

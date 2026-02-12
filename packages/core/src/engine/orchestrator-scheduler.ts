@@ -16,6 +16,7 @@ const DEFAULT_SCHEDULER_CONFIG: OrchestratorSchedulerConfig = {
 export class OrchestratorScheduler {
   private timer: ReturnType<typeof setInterval> | null = null;
   private processing = false;
+  private currentTick: Promise<void> | null = null;
   private readonly config: OrchestratorSchedulerConfig;
 
   constructor(
@@ -30,10 +31,17 @@ export class OrchestratorScheduler {
     this.timer = setInterval(() => void this.tick(), this.config.pollIntervalMs);
   }
 
-  stop(): void {
+  /**
+   * Stop the scheduler. Waits for any in-flight tick to complete.
+   */
+  async stop(): Promise<void> {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    // Wait for in-flight tick to finish
+    if (this.currentTick) {
+      await this.currentTick;
     }
   }
 
@@ -46,8 +54,10 @@ export class OrchestratorScheduler {
     if (this.processing) return; // re-entrancy guard
     this.processing = true;
     try {
-      await this.orchestrator.processQueue();
+      this.currentTick = this.orchestrator.processQueue();
+      await this.currentTick;
     } finally {
+      this.currentTick = null;
       this.processing = false;
     }
   }

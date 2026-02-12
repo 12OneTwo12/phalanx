@@ -32,7 +32,7 @@ export interface ModelSelectorConfig {
 }
 
 const DEFAULT_MODEL_TIERS: ModelSelectorConfig = {
-  high: { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
+  high: { provider: 'anthropic', model: 'claude-opus-4-6' },
   medium: { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929' },
   low: { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
 };
@@ -81,12 +81,9 @@ export class ModelSelector {
       };
     }
 
-    // Last resort: return configured tier as-is
-    return {
-      provider: tier.provider,
-      model: tier.model,
-      fullId: `${tier.provider}/${tier.model}`,
-      resolvedFrom: 'system',
-    };
+    // No providers available — cannot proceed
+    throw new Error(
+      `No LLM providers available. Configured provider "${tier.provider}" not found and no fallbacks registered.`,
+    );
   }
 }

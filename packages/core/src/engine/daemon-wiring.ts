@@ -87,15 +87,21 @@ export class DaemonWiring {
       eventBus?.emit('heartbeat:report', { report: data.report });
     });
 
-    // 2. Proposal approved → execute side effects
+    // 2. Proposal approved → execute side effects (synchronous)
     this.on(proposalService, 'proposal:approved', (data: { proposalId: string }) => {
-      const result = proposalExecutor.execute(data.proposalId);
-      eventBus?.emit('proposal:executed', { result });
+      try {
+        const result = proposalExecutor.execute(data.proposalId);
+        eventBus?.emit('proposal:executed', { result });
+      } catch {
+        /* proposal execution failure is non-fatal */
+      }
     });
 
     // 3. Ticket submitted → verification
     this.on(orchestrator, 'ticket:submitted', (data: { ticketId: string }) => {
-      void completionHandler.handleSubmitted(data.ticketId);
+      void completionHandler.handleSubmitted(data.ticketId).catch(() => {
+        /* verification failure handled by VerificationService events */
+      });
       eventBus?.emit('ticket:submitted', { ticketId: data.ticketId });
     });
 
@@ -162,10 +168,10 @@ export class DaemonWiring {
   }
 
   /**
-   * Stop the daemon gracefully.
+   * Stop the daemon gracefully. Waits for in-flight operations to complete.
    */
-  stop(): void {
-    this.deps.orchestratorScheduler.stop();
+  async stop(): Promise<void> {
+    await this.deps.orchestratorScheduler.stop();
     this.deps.heartbeatService.stop();
     this.started = false;
   }

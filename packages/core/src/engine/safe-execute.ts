@@ -36,9 +36,11 @@ export async function safeExecute<T>(
     const value = await fn();
     return { ok: true, value };
   } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
-    error.message = `[${context.operation}]${context.ticketId ? ` ticket=${context.ticketId}` : ''}${context.agentId ? ` agent=${context.agentId}` : ''}: ${error.message}`;
-    return { ok: false, error };
+    const original = err instanceof Error ? err : new Error(String(err));
+    const prefix = `[${context.operation}]${context.ticketId ? ` ticket=${context.ticketId}` : ''}${context.agentId ? ` agent=${context.agentId}` : ''}`;
+    const wrapped = new Error(`${prefix}: ${original.message}`, { cause: original });
+    wrapped.name = original.name;
+    return { ok: false, error: wrapped };
   }
 }
 

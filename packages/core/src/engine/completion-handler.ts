@@ -42,7 +42,10 @@ export class CompletionHandler extends EventEmitter {
    */
   handlePass(ticketId: string): void {
     const ticket = this.ticketRepo.findById(ticketId);
-    if (!ticket) return;
+    if (!ticket) {
+      this.emit('warning', { message: `handlePass: ticket ${ticketId} not found` });
+      return;
+    }
 
     // Update goal progress
     const epic = this.epicRepo.findById(ticket.epicId);
@@ -65,7 +68,10 @@ export class CompletionHandler extends EventEmitter {
    */
   handleEscalation(ticketId: string): void {
     const ticket = this.ticketRepo.findById(ticketId);
-    if (!ticket) return;
+    if (!ticket) {
+      this.emit('warning', { message: `handleEscalation: ticket ${ticketId} not found` });
+      return;
+    }
 
     this.escalationRepo.create({
       id: randomUUID(),
