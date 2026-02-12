@@ -7,3 +7,4 @@ export * from './db/index.js';
 export * from './conventions/index.js';
 export * from './engine/index.js';
 export * from './heartbeat/index.js';
+export * from './channel/index.js';
