@@ -1188,6 +1188,25 @@ interface ConventionProposal {
 
 ---
 
+## 11. 확장 비전: 분산 워커 아키텍처
+
+> 상세 설계는 `PLANNING.ko.md` 섹션 8.1 참조
+
+Phase 1~2는 단일 프로세스 데몬으로 동작하지만, Phase 3+에서 **다른 PC를 워커 노드로 등록하여 Agent를 분산 실행**하는 것을 목표로 한다.
+
+**Phase 1에서의 설계 고려 사항:**
+
+| 모듈 | 분산 확장을 위한 고려 |
+|------|---------------------|
+| **Orchestrator** | Agent 실행 위치(로컬/원격)를 추상화할 수 있는 인터페이스로 설계. `AgentRunner.execute()`가 실행 환경에 독립적이어야 함 |
+| **Ticket Manager** | 이미 `ticket/{id}-{slug}` 브랜치 격리 전략을 사용하므로 분산 모델과 자연스럽게 호환 |
+| **Tool Layer** | 각 도구가 `ToolContext.workingDir` 기반으로 동작하므로 워커의 로컬 clone에서도 동일하게 실행 가능 |
+| **LLM Provider Layer** | 이미 원격 엔드포인트(Ollama 등)를 지원하므로 워커의 로컬 LLM 활용 가능 |
+
+Phase 1 구현 시 위 모듈들의 인터페이스를 확장 가능하게 설계하되, **분산 관련 코드는 작성하지 않는다.** "구현하기 쉬운 인터페이스"만 확보하면 충분하다.
+
+---
+
 ## 부록: MVP 이후 확장 계획 (Phase 2-3)
 
 ### Phase 2 (+4주)

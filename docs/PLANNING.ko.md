@@ -1787,6 +1787,101 @@ Provider별 비용은 사용자의 선택과 사용량에 따르므로, 일률�
 - [ ] 플러그인 시스템 (커스텀 스킬)
 - [ ] 사용자 커뮤니티 (팀 템플릿 공유)
 - [ ] DevOps Agent (CI/CD, 배포 자동화)
+- [ ] **분산 워커 아키텍처** (다른 PC를 워커로 등록하여 Agent 실행)
+
+### 8.1 확장 비전: 분산 워커 아키텍처 (Phase 3+)
+
+Phase 1~2는 **단일 프로세스 데몬**으로 동작한다. 하지만 아키텍처는 **Git 기반 분산 협업**으로 자연스럽게 확장 가능하도록 설계한다.
+
+#### 핵심 컨셉: "쿠버네티스처럼, 하지만 AI Agent를 위한"
+
+```
+K8s Pod        = Phalanx Agent (실행 단위)
+K8s Node       = Worker Node (물리 머신)
+K8s Scheduler  = Orchestrator (Agent 스케줄링)
+K8s ConfigMap  = SOUL.md / SKILLS.md (Agent 설정)
+K8s Service    = Agent 간 통신 채널
+```
+
+#### 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Master Node (phalanx daemon)                                │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Orchestrator (스케줄러)                               │   │
+│  │  - 워커 등록/디스커버리/헬스체크                        │   │
+│  │  - Ticket → 워커 할당 (idle 워커 우선)                  │   │
+│  │  - 워커 없으면 마스터에서 직접 실행 (Phase 1과 동일)     │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────┐ ┌──────────────┐ ┌────────────────────┐  │
+│  │ Dashboard    │ │ SQLite DB    │ │ Team Lead Agent    │  │
+│  │ (:3000)      │ │ (source of   │ │ (항상 마스터에서)   │  │
+│  │              │ │  truth)      │ │                    │  │
+│  └──────────────┘ └──────────────┘ └────────────────────┘  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ Worker API (등록, 할당, 결과 보고)
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│  Worker Node A   │ │  Worker Node B   │ │  Worker Node C   │
+│  (개발 PC)       │ │  (GPU 서버)      │ │  (CI 서버)       │
+│                  │ │                  │ │                  │
+│  Agent Runtime   │ │  Agent Runtime   │ │  Agent Runtime   │
+│  + Git clone     │ │  + Git clone     │ │  + Git clone     │
+│  + LLM Provider  │ │  + Ollama (로컬) │ │  + LLM Provider  │
+│  + Tool Layer    │ │  + Tool Layer    │ │  + Tool Layer    │
+└──────────────────┘ └──────────────────┘ └──────────────────┘
+```
+
+#### Git 기반 협업 모델: 인간 팀과 동일
+
+실제 인간 개발팀도 파일시스템을 공유하지 않는다. 각자 로컬에 clone하고, 브랜치에서 작업하고, push하고, PR을 올린다. **Agent도 동일한 방식으로 협업한다.**
+
+```
+1. Master Orchestrator가 Ticket을 Worker에 할당
+2. Worker가 git pull → ticket/{id}-{slug} 브랜치 생성
+3. Worker의 Agent가 로컬에서 자유롭게 파일 읽기/쓰기/테스트
+4. 작업 완료 → git commit → git push
+5. Master가 PR 생성 → QA 검증 → 머지
+```
+
+- 각 Ticket은 독립된 브랜치에서 작업하므로 **충돌 없음**
+- 코드베이스 분석 등 현재 상태가 필요한 작업은 **마스터에서 실행** (Team Lead)
+- 실행 단위(Ticket)가 워커 단위와 1:1 대응하여 **격리가 자연스러움**
+
+#### 워커 등록 및 폴백
+
+```
+# 다른 PC에서 워커 등록
+phalanx worker join --master <master-ip>:9000 --name "gpu-server"
+
+# 마스터에서 워커 목록 확인
+phalanx worker list
+  NAME         STATUS   AGENTS   CAPABILITIES
+  gpu-server   Ready    0/4      ollama, gpu
+  dev-pc-2     Ready    0/2      claude, openai
+```
+
+**워커가 없으면?** → Phase 1과 완전히 동일하게 마스터에서 모든 Agent를 실행한다. 워커는 순수한 **옵션**이며, 없어도 시스템이 100% 동작한다.
+
+#### 주요 활용 시나리오
+
+| 시나리오 | 구성 | 이점 |
+|----------|------|------|
+| **GPU 서버에서 로컬 LLM** | Worker에 Ollama 설치 → QA/Customer Agent 실행 | API 비용 절감 |
+| **빌드/테스트 오프로딩** | CI 서버를 Worker로 등록 → 무거운 테스트 실행 | 마스터 부하 분산 |
+| **멀티 개발자 팀** | 각 개발자 PC를 Worker로 등록 | 팀원별 Agent 실행 리소스 공유 |
+| **Provider 분산** | Worker별 다른 API Key → Rate Limit 분산 | 처리량 증가 |
+
+#### Phase 1 설계 시 고려 사항
+
+분산 워커는 Phase 3+에서 구현하지만, Phase 1부터 다음을 염두에 둔다:
+
+- **Ticket-per-Branch 격리**: 이미 Phase 1의 `ticket/{id}-{slug}` 브랜치 전략이 분산 모델과 호환
+- **Orchestrator의 할당 추상화**: Agent 실행 위치(로컬/원격)를 추상화할 수 있는 인터페이스 설계
+- **Tool Layer 독립성**: Tool Layer가 로컬 파일시스템에서 독립적으로 동작하므로, 워커에서도 동일하게 실행 가능
+- **Multi-Provider Layer**: 이미 원격 Ollama 엔드포인트를 지원하므로, 워커의 LLM을 자연스럽게 활용 가능
 
 ## 9. Competitive Positioning
 

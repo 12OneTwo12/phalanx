@@ -1188,6 +1188,25 @@ interface ConventionProposal {
 
 ---
 
+## 11. Extension Vision: Distributed Worker Architecture
+
+> Detailed design: see `PLANNING.md` section 8.1
+
+Phase 1~2 operates as a single-process daemon, but Phase 3+ targets **registering other PCs as worker nodes to run Agents in a distributed manner**.
+
+**Phase 1 Design Considerations:**
+
+| Module | Consideration for Distributed Extension |
+|--------|----------------------------------------|
+| **Orchestrator** | Design `AgentRunner.execute()` to be execution-environment agnostic (local/remote) |
+| **Ticket Manager** | Already uses `ticket/{id}-{slug}` branch isolation — naturally compatible with distributed model |
+| **Tool Layer** | Tools operate based on `ToolContext.workingDir` — works identically on worker's local git clone |
+| **LLM Provider Layer** | Already supports remote endpoints (Ollama etc.) — worker's local LLM is naturally usable |
+
+Phase 1 ensures extensible interfaces for the above modules, but **no distributed code is written**. Only "easy-to-extend interfaces" are needed.
+
+---
+
 ## Appendix: Post-MVP Expansion Plan (Phase 2-3)
 
 ### Phase 2 (+4 weeks)
@@ -1204,6 +1223,7 @@ interface ConventionProposal {
 - Plugin system
 - Community templates
 - DevOps Agent (CI/CD)
+- **Distributed Worker Architecture** (register other PCs as workers to run Agents remotely, Git-based collaboration)
 
 ---
 

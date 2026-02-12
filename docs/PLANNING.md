@@ -1802,6 +1802,101 @@ Instead, we focus on **strategies to optimize costs**.
 - [ ] Plugin system (custom skills)
 - [ ] User community (team template sharing)
 - [ ] DevOps Agent (CI/CD, deployment automation)
+- [ ] **Distributed Worker Architecture** (register other PCs as workers to run Agents remotely)
+
+### 8.1 Extension Vision: Distributed Worker Architecture (Phase 3+)
+
+Phase 1~2 operates as a **single-process daemon**. However, the architecture is designed to naturally extend toward **Git-based distributed collaboration**.
+
+#### Core Concept: "Like Kubernetes, but for AI Agents"
+
+```
+K8s Pod        = Phalanx Agent (execution unit)
+K8s Node       = Worker Node (physical machine)
+K8s Scheduler  = Orchestrator (Agent scheduling)
+K8s ConfigMap  = SOUL.md / SKILLS.md (Agent config)
+K8s Service    = Agent communication channel
+```
+
+#### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Master Node (phalanx daemon)                                │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Orchestrator (scheduler)                             │   │
+│  │  - Worker registration/discovery/health check         │   │
+│  │  - Ticket → Worker assignment (idle workers first)    │   │
+│  │  - No workers? Execute on master (same as Phase 1)    │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────┐ ┌──────────────┐ ┌────────────────────┐  │
+│  │ Dashboard    │ │ SQLite DB    │ │ Team Lead Agent    │  │
+│  │ (:3000)      │ │ (source of   │ │ (always on master) │  │
+│  │              │ │  truth)      │ │                    │  │
+│  └──────────────┘ └──────────────┘ └────────────────────┘  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ Worker API (register, assign, report)
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│  Worker Node A   │ │  Worker Node B   │ │  Worker Node C   │
+│  (dev PC)        │ │  (GPU server)    │ │  (CI server)     │
+│                  │ │                  │ │                  │
+│  Agent Runtime   │ │  Agent Runtime   │ │  Agent Runtime   │
+│  + Git clone     │ │  + Git clone     │ │  + Git clone     │
+│  + LLM Provider  │ │  + Ollama (local)│ │  + LLM Provider  │
+│  + Tool Layer    │ │  + Tool Layer    │ │  + Tool Layer    │
+└──────────────────┘ └──────────────────┘ └──────────────────┘
+```
+
+#### Git-Based Collaboration Model: Same as Human Teams
+
+Real human development teams don't share filesystems. Each developer clones locally, works on branches, pushes, and creates PRs. **Agents collaborate in exactly the same way.**
+
+```
+1. Master Orchestrator assigns Ticket to Worker
+2. Worker does git pull → creates ticket/{id}-{slug} branch
+3. Worker's Agent freely reads/writes/tests files locally
+4. Work complete → git commit → git push
+5. Master creates PR → QA verification → merge
+```
+
+- Each Ticket works on an isolated branch — **no conflicts**
+- Operations requiring current codebase state (analysis) run on **master** (Team Lead)
+- Execution units (Tickets) map 1:1 to worker units — **natural isolation**
+
+#### Worker Registration & Fallback
+
+```
+# Register a worker from another PC
+phalanx worker join --master <master-ip>:9000 --name "gpu-server"
+
+# Check worker list on master
+phalanx worker list
+  NAME         STATUS   AGENTS   CAPABILITIES
+  gpu-server   Ready    0/4      ollama, gpu
+  dev-pc-2     Ready    0/2      claude, openai
+```
+
+**No workers registered?** → System operates exactly like Phase 1, running all Agents on the master node. Workers are a pure **opt-in extension**.
+
+#### Key Use Cases
+
+| Scenario | Setup | Benefit |
+|----------|-------|---------|
+| **Local LLM on GPU server** | Install Ollama on Worker → run QA/Customer Agents | API cost savings |
+| **Build/test offloading** | Register CI server as Worker → run heavy tests | Master load reduction |
+| **Multi-developer team** | Each developer's PC as Worker | Shared Agent execution resources |
+| **Provider distribution** | Different API keys per Worker → distribute rate limits | Increased throughput |
+
+#### Phase 1 Design Considerations
+
+Distributed workers are implemented in Phase 3+, but Phase 1 keeps these in mind:
+
+- **Ticket-per-Branch isolation**: Already compatible with distributed model via `ticket/{id}-{slug}` branching strategy
+- **Orchestrator assignment abstraction**: `AgentRunner.execute()` interface designed to be execution-environment agnostic
+- **Tool Layer independence**: Tools operate based on `ToolContext.workingDir`, works identically on worker's local clone
+- **Multi-Provider Layer**: Already supports remote endpoints (Ollama etc.), naturally leverages worker's local LLM
 
 ## 9. Competitive Positioning
 
