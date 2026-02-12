@@ -294,17 +294,32 @@ export async function authenticateProvider(
   for (const strategy of strategies) {
     const detected = strategy.detect();
     if (detected.found && detected.credential) {
-      p.log.info(`Found ${strategy.label} credentials (${detected.source})`);
-      const s = p.spinner();
-      s.start(`Validating ${providerLabel}...`);
-      const result = await strategy.validate(detected.credential);
-      if (result.valid) {
-        s.stop(`${providerLabel}: validated via ${strategy.label}`);
-        saveCredential(providerName, detected.credential);
-        return { valid: true, authMode: strategy.authMode };
+      p.log.info(`Found existing ${strategy.label} credentials (${detected.source})`);
+
+      // Ask user whether to keep or replace
+      const action = await p.select({
+        message: `${providerLabel}: existing credentials found. What do you want to do?`,
+        options: [
+          { value: 'keep' as const, label: 'Keep current credentials', hint: `${maskSecret(detected.credential.secret)}` },
+          { value: 'replace' as const, label: 'Enter new credentials', hint: 'replace with a new key/token' },
+        ],
+      });
+      if (p.isCancel(action)) return null;
+
+      if (action === 'keep') {
+        const s = p.spinner();
+        s.start(`Validating ${providerLabel}...`);
+        const result = await strategy.validate(detected.credential);
+        if (result.valid) {
+          s.stop(`${providerLabel}: validated via ${strategy.label}`);
+          saveCredential(providerName, detected.credential);
+          return { valid: true, authMode: strategy.authMode };
+        }
+        s.stop(`${providerLabel}: validation failed (${result.error})`);
+        p.log.warn('Existing credentials are invalid. Please enter new ones.');
       }
-      s.stop(`${providerLabel}: validation failed (${result.error})`);
-      // Fall through to manual selection
+      // Fall through to manual selection (replace or keep-but-invalid)
+      break;
     }
   }
 

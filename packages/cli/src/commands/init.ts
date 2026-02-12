@@ -20,7 +20,17 @@ export const initCommand = new Command('init')
     const configFile = join(configDir, 'config.json');
     if (existsSync(configFile)) {
       logger.warn('Phalanx is already initialized in this directory.');
-      logger.dim('Run "phalanx config" to reconfigure.');
+      if (opts.wizard && process.stdout.isTTY) {
+        const { loadConfig } = await import('../utils/config-loader.js');
+        const existing = loadConfig();
+        if (existing) {
+          logger.dim('Running setup wizard to reconfigure...');
+          console.log();
+          await runSetupWizard(existing);
+        }
+      } else {
+        logger.dim('Run "phalanx config" to reconfigure.');
+      }
       return;
     }
 
