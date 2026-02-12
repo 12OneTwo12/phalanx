@@ -164,6 +164,27 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             </button>
           </div>
         )}
+
+        {/* Retry action for failed tickets */}
+        {ticket.status === 'failed' && (
+          <div className="mt-3">
+            <button
+              onClick={async () => {
+                setActionLoading(true);
+                try {
+                  await apiPost(`/tickets/${id}/retry`, {});
+                  await refreshTicket();
+                } finally {
+                  setActionLoading(false);
+                }
+              }}
+              disabled={actionLoading}
+              className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+            >
+              {actionLoading ? 'Retrying...' : 'Retry Ticket'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Description */}
