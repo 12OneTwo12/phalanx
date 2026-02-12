@@ -366,6 +366,29 @@ export type KnowledgeEntry = typeof knowledgeEntries.$inferSelect;
 export type NewKnowledgeEntry = typeof knowledgeEntries.$inferInsert;
 
 // ---------------------------------------------------------------------------
+// Ticket Comments
+// ---------------------------------------------------------------------------
+
+export const ticketComments = sqliteTable('ticket_comments', {
+  id: text('id').primaryKey(),
+  ticketId: text('ticket_id')
+    .notNull()
+    .references(() => tickets.id, { onDelete: 'cascade' }),
+  author: text('author').notNull(), // agent role | 'user' | 'system'
+  type: text('type', {
+    enum: ['plan', 'progress', 'completion', 'review', 'comment'],
+  })
+    .notNull()
+    .default('comment'),
+  content: text('content').notNull(), // Markdown
+  metadata: text('metadata'), // JSON
+  ...timestamps,
+});
+
+export type TicketComment = typeof ticketComments.$inferSelect;
+export type NewTicketComment = typeof ticketComments.$inferInsert;
+
+// ---------------------------------------------------------------------------
 // Channel Messages
 // ---------------------------------------------------------------------------
 

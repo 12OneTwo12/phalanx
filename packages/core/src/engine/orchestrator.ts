@@ -30,16 +30,23 @@ export class Orchestrator extends EventEmitter {
 
   /**
    * Process all ready tickets respecting dependency order and concurrency limits.
+   * Also picks up in_progress tickets that need retry (came back from verification failure).
    */
   async processQueue(): Promise<void> {
     const assigned = this.ticketRepo.findByStatus('assigned');
-    const ready = assigned.filter((t) => this.areDependenciesMet(t));
+    const readyAssigned = assigned.filter((t) => this.areDependenciesMet(t));
+
+    // Pick up in_progress tickets that need retry (retryCount > 0 means they were retried)
+    const retrying = this.ticketRepo.findByStatus('in_progress')
+      .filter((t) => t.retryCount > 0 && !this.activeTickets.has(t.id));
+
+    const allReady = [...readyAssigned, ...retrying];
 
     // Respect concurrency limit
     const available = this.config.maxConcurrency - this.activeTickets.size;
     if (available <= 0) return;
 
-    const toProcess = ready.slice(0, available);
+    const toProcess = allReady.slice(0, available);
 
     await Promise.allSettled(
       toProcess.map((ticket) => this.executeTicket(ticket)),
@@ -54,22 +61,25 @@ export class Orchestrator extends EventEmitter {
     this.activeTickets.add(ticket.id);
 
     try {
-      // Transition to in_progress
-      const inProgress = TicketStateMachine.transition(ticket.status, 'start');
-      this.ticketRepo.update(ticket.id, { status: inProgress });
-      this.emit('ticket:started', { ticketId: ticket.id });
+      // Transition to in_progress only if coming from 'assigned' (not retry)
+      if (ticket.status === 'assigned') {
+        const inProgress = TicketStateMachine.transition(ticket.status, 'start');
+        this.ticketRepo.update(ticket.id, { status: inProgress });
+        this.emit('ticket:started', { ticketId: ticket.id });
+      }
+      // If already in_progress (retry from verification failure), skip the start transition
 
       // Execute via injected executor
       const result = await this.executor.execute(ticket);
 
       if (result.success) {
-        // Transition to verification
-        const verification = TicketStateMachine.transition(inProgress, 'submit');
+        // Transition to verification (from in_progress)
+        const verification = TicketStateMachine.transition('in_progress', 'submit');
         this.ticketRepo.update(ticket.id, { status: verification });
         this.emit('ticket:submitted', { ticketId: ticket.id });
       } else {
-        // Transition to failed
-        const failed = TicketStateMachine.transition(inProgress, 'error');
+        // Transition to failed (from in_progress)
+        const failed = TicketStateMachine.transition('in_progress', 'error');
         this.ticketRepo.update(ticket.id, { status: failed });
         this.emit('ticket:failed', { ticketId: ticket.id, error: result.error });
       }

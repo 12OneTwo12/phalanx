@@ -102,10 +102,9 @@ export class ProposalExecutor {
   }
 
   /** Store executed ticket ID in proposal metadata for idempotency */
-  private markExecuted(proposal: Proposal, ticketId: string): void {
-    const raw = proposal.metadata ? JSON.parse(proposal.metadata) : {};
-    raw._executedTicketId = ticketId;
-    this.proposalRepo.update(proposal.id, { metadata: JSON.stringify(raw) });
+  private markExecuted(proposal: Proposal, parsedMeta: Record<string, unknown>, ticketId: string): void {
+    parsedMeta._executedTicketId = ticketId;
+    this.proposalRepo.update(proposal.id, { metadata: JSON.stringify(parsedMeta) });
   }
 
   private executeNewTicket(proposal: Proposal): ProposalExecutionResult {
@@ -137,7 +136,7 @@ export class ProposalExecutor {
       proposedBy: 'team-lead',
     });
 
-    this.markExecuted(proposal, ticket.id);
+    this.markExecuted(proposal, meta as unknown as Record<string, unknown>, ticket.id);
     return { success: true, proposalId: proposal.id, action: 'new_ticket', ticketId: ticket.id };
   }
 
@@ -198,7 +197,7 @@ export class ProposalExecutor {
       proposedBy: 'team-lead',
     });
 
-    this.markExecuted(proposal, ticket.id);
+    this.markExecuted(proposal, meta as unknown as Record<string, unknown>, ticket.id);
     return { success: true, proposalId: proposal.id, action: 'improvement', ticketId: ticket.id };
   }
 }

@@ -15,6 +15,7 @@ export {
   DefaultAgentConfigResolver,
   type AgentTicketExecutorConfig,
   type AgentConfigResolver,
+  type PostExecutionHook,
 } from './agent-ticket-executor.js';
 export { injectConventions } from './convention-injector.js';
 export * from './verification/index.js';
@@ -25,3 +26,29 @@ export {
   type PipelineResult,
   type TicketPipelineConfig,
 } from './ticket-pipeline.js';
+export {
+  OrchestratorScheduler,
+  type OrchestratorSchedulerConfig,
+} from './orchestrator-scheduler.js';
+export {
+  ModelSelector,
+  type ModelSelectorConfig,
+  type TicketAnalysis,
+  type TicketComplexity,
+} from './model-selector.js';
+export { AgentConfigurator } from './agent-configurator.js';
+export {
+  SmartAssignmentService,
+  type AssignmentResult,
+} from './smart-assignment-service.js';
+export { CompletionHandler } from './completion-handler.js';
+export { DaemonWiring, type DaemonDeps } from './daemon-wiring.js';
+export {
+  safeExecute,
+  RecoveryManager,
+  type Result,
+  type SafeExecuteContext,
+  type RecoveryState,
+} from './safe-execute.js';
+export { AutoCommenter } from './auto-commenter.js';
+export { WorkLogRecorder } from './work-log-recorder.js';

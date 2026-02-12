@@ -4,7 +4,12 @@ import {
   getTicketRepository,
 } from '@/lib/db';
 import { jsonResponse, errorResponse, parseBody } from '@/lib/api-utils';
-import { DecompositionService, ManualDecompositionStrategy } from '@phalanx/core';
+import { getLLMProvider } from '@/lib/llm-provider';
+import {
+  DecompositionService,
+  ManualDecompositionStrategy,
+  LLMDecompositionStrategy,
+} from '@phalanx/core';
 import type { DecomposedEpic } from '@phalanx/core';
 
 interface RouteParams {
@@ -16,7 +21,7 @@ interface RouteParams {
  *
  * Body options:
  *  - `{ epics: DecomposedEpic[] }` — manual decomposition with explicit structure
- *  - `{}` — placeholder for future LLM-powered decomposition
+ *  - `{}` or `{ mode: "llm" }` — LLM-powered decomposition (requires configured provider)
  */
 export async function POST(request: Request, { params }: RouteParams) {
   const { id } = await params;
@@ -24,17 +29,26 @@ export async function POST(request: Request, { params }: RouteParams) {
   const goal = getGoalRepository().findById(id);
   if (!goal) return errorResponse('Goal not found', 404);
 
-  const body = await parseBody<{ epics?: DecomposedEpic[] }>(request);
+  const body = await parseBody<{ epics?: DecomposedEpic[]; mode?: 'llm' | 'manual' }>(request);
 
-  // Use manual strategy if epics are provided, otherwise return error
-  // (LLM strategy requires provider configuration via service layer)
-  if (!body?.epics || body.epics.length === 0) {
-    return errorResponse(
-      'epics array is required. Provide an array of { title, description, tickets: [...] }',
-    );
+  let strategy;
+
+  if (body?.epics && body.epics.length > 0) {
+    // Manual strategy: explicit epics provided
+    strategy = new ManualDecompositionStrategy(body.epics);
+  } else {
+    // LLM strategy: auto-decompose using configured provider
+    const llm = getLLMProvider();
+    if (!llm) {
+      return errorResponse(
+        'No LLM provider configured. Either provide explicit epics or configure a provider via phalanx init.',
+      );
+    }
+    strategy = new LLMDecompositionStrategy(llm.provider, {
+      config: { model: llm.model, maxTokens: 4096, temperature: 0.3 },
+    });
   }
 
-  const strategy = new ManualDecompositionStrategy(body.epics);
   const service = new DecompositionService(
     getGoalRepository(),
     getEpicRepository(),
@@ -42,6 +56,13 @@ export async function POST(request: Request, { params }: RouteParams) {
     strategy,
   );
 
-  const result = await service.decompose(id);
-  return jsonResponse(result, 201);
+  try {
+    const result = await service.decompose(id);
+    return jsonResponse(result, 201);
+  } catch (err) {
+    return errorResponse(
+      `Decomposition failed: ${err instanceof Error ? err.message : String(err)}`,
+      500,
+    );
+  }
 }

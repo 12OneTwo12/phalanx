@@ -17,3 +17,4 @@ export { WorkLogRepository } from './work-log.repository.js';
 export { DecisionRecordRepository } from './decision-record.repository.js';
 export { KnowledgeEntryRepository } from './knowledge-entry.repository.js';
 export { ChannelMessageRepository } from './channel-message.repository.js';
+export { TicketCommentRepository } from './ticket-comment.repository.js';

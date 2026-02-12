@@ -80,8 +80,14 @@ export class MemoryWriter {
       // File doesn't exist yet — start fresh
     }
 
-    // Deduplicate: skip entries whose content already appears in MEMORY.md
-    const newEntries = entries.filter(e => !existing.includes(e.content));
+    // Deduplicate: skip entries whose formatted line already exists in MEMORY.md.
+    // Use the exact formatted pattern to avoid false positives from substring matching.
+    const existingLines = new Set(existing.split('\n').map(l => l.trim()));
+    const newEntries = entries.filter(e => {
+      const ticketTag = e.ticketId ? ` _(${e.ticketId})_` : '';
+      const formatted = `- **[${e.category}]** ${e.content}${ticketTag}`;
+      return !existingLines.has(formatted);
+    });
     if (newEntries.length === 0) return 0;
 
     // Format new section

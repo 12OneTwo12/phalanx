@@ -15,6 +15,7 @@ import {
   SoulLoader,
   ToolRegistry,
   BUILTIN_TOOLS,
+  ConventionLoader,
   type LLMProvider,
   type AgentConfig,
   type AgentExecutionResult,
@@ -105,6 +106,7 @@ export function createTeamLeadAgent(
   const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? process.cwd();
   const templatesDir = config?.templatesDir ?? path.join(projectRoot, 'templates');
   const soulLoader = new SoulLoader(templatesDir);
+  const conventionLoader = new ConventionLoader(projectRoot);
 
   // Build tool registry with both builtin and dashboard tools
   const toolRegistry = new ToolRegistry();
@@ -122,6 +124,9 @@ export function createTeamLeadAgent(
       const augmentedSkills = soul.skills + DASHBOARD_SKILLS_AUGMENTATION;
 
       const task = formatChatAsTask(chatHistory);
+
+      // Load project conventions (graceful skip if none exist)
+      const conventions = conventionLoader.formatForPrompt() || undefined;
 
       const agentConfig: AgentConfig = {
         id: 'team-lead',
@@ -142,6 +147,7 @@ export function createTeamLeadAgent(
         workingDirectory: projectRoot,
         maxIterations: config?.maxIterations ?? 15,
         temperature: 0.3,
+        conventions,
       };
 
       return executor.run(agentConfig, task);

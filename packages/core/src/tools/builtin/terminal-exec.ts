@@ -48,9 +48,11 @@ function hasCommandSubstitution(command: string): boolean {
  * Returns all base commands found.
  */
 function extractBaseCommands(command: string): string[] {
-  // Split on pipes, &&, ||, ; — extract the first word from each part
+  // Split on pipes, &&, ||, ;, and newlines — extract the first word from each part.
+  // Newlines are command separators in /bin/sh, so they MUST be split here
+  // to prevent newline injection bypassing the allowlist.
   return command
-    .split(/[|&;]+/)
+    .split(/[\n|&;]+/)
     .map(part => part.trim())
     .filter(Boolean)
     .map(part => part.split(/\s+/)[0]);
@@ -116,6 +118,23 @@ export const terminalExecTool: Tool<typeof schema> = {
           error: 'Command blocked: matches a dangerous command pattern',
         };
       }
+    }
+
+    // Enforce command allowlist via security policy or default config
+    if (context.securityPolicy) {
+      if (!context.securityPolicy.isCommandAllowed(params.command)) {
+        return {
+          success: false,
+          content: '',
+          error: 'Command blocked: not in the allowed commands list',
+        };
+      }
+    } else if (!isCommandAllowed(params.command, { allowlistMode: true })) {
+      return {
+        success: false,
+        content: '',
+        error: 'Command blocked: not in the allowed commands list',
+      };
     }
 
     try {

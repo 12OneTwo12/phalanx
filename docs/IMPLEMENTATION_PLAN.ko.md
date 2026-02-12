@@ -43,10 +43,15 @@
 │  └──────────────┬───────────────────────────────────────┘   │
 │                 │                                            │
 │  ┌──────────────┴───────────────────────────────────────┐   │
-│  │              Orchestrator                             │   │
+│  │              Orchestrator (LLM 강화)                   │   │
 │  │  ┌─────────────┐ ┌──────────────┐ ┌──────────────┐  │   │
-│  │  │  Ticket      │ │  Verification│ │  PR Control  │  │   │
-│  │  │  Assignment  │ │  Loop        │ │  (3 modes)   │  │   │
+│  │  │  Smart       │ │  Agent       │ │  Model       │  │   │
+│  │  │  Assignment  │ │  Configurator│ │  Selector    │  │   │
+│  │  │  (LLM)       │ │  (LLM)       │ │  (rules)     │  │   │
+│  │  └─────────────┘ └──────────────┘ └──────────────┘  │   │
+│  │  ┌─────────────┐ ┌──────────────┐ ┌──────────────┐  │   │
+│  │  │  Scheduler   │ │  Verification│ │  PR Control  │  │   │
+│  │  │  + Queue     │ │  Loop        │ │  (3 modes)   │  │   │
 │  │  └─────────────┘ └──────────────┘ └──────────────┘  │   │
 │  └──────────────┬───────────────────────────────────────┘   │
 │                 │                                            │
@@ -187,6 +192,24 @@ agents/{agent-id}/
 
 **레퍼런스:** oh-my-opencode Prometheus → plan → Atlas 실행 패턴
 
+#### 3.4.1 Team Lead vs Orchestrator: 역할 분리
+
+| 구분 | Team Lead (PM Agent) | Orchestrator (LLM 강화 엔진) |
+|------|---------------------|-------------------------------|
+| **본질** | LLM 기반 AI 에이전트 | LLM 추론 + 시스템 코드 하이브리드 |
+| **역할** | 무엇을 할지 (기획) | 누가, 어떻게 실행할지 |
+| **Goal 분해** | Goal → Epic → Ticket (LLM) | — |
+| **에이전트 할당** | — | LLM 기반 티켓 분석 → 최적 에이전트 선택/생성 |
+| **에이전트 생성** | — | LLM이 티켓별 커스텀 SOUL/SKILLS 생성 |
+| **모델 선택** | — | 복잡도 기반 최적 Provider/Model |
+| **Heartbeat** | 컨텍스트 분석 + 보고서 생성 | 스케줄러 관리 |
+| **제안** | 제안 생성 (LLM) | 승인된 제안 실행 |
+| **검증** | — | QA 검증 파이프라인 |
+| **PR 관리** | — | PR 생성 + 머지 결정 |
+| **사용자 소통** | Direct Channel 대화 | — |
+
+#### 3.4.2 Goal → Ticket 분해 프로세스 (CEO↔PM 모델)
+
 **Goal → Ticket 분해 프로세스 (CEO↔PM 모델):**
 ```
 1. 사용자(CEO)가 Goal 입력 (예: "MVP 쇼핑몰 3주 내 완성")
@@ -198,12 +221,67 @@ agents/{agent-id}/
 4. Epic → Ticket으로 2차 분해 (실행 가능한 단위)
 5. 분해 결과를 사용자에게 제출 → 승인 대기
    - [전체 승인] [수정 후 승인] [거절]
-6. 사용자 승인 후 → Ticket에 에이전트 배정 + 모델 선택
-7. SQLite에 저장 + Dashboard 반영 → 자율 실행 시작
+6. 사용자 승인 후 → Ticket이 Orchestrator 큐에 진입
+7. Orchestrator가 LLM 스마트 할당 수행 (3.4.3 참조)
+8. SQLite에 저장 + Dashboard 반영 → 자율 실행 시작
 
 ※ 이미 승인된 Ticket은 Agent가 자율적으로 실행 (사용자 개입 불필요)
 ※ Team Lead는 역제안도 가능 ("이런 것도 하면 어때요?" → 사용자 승인 후 실행)
 ```
+
+#### 3.4.3 Orchestrator: LLM 스마트 할당 & Agent 자동 생성
+
+Orchestrator는 LLM 추론 (Thinking Level: LOW, 비용 최적화)을 사용하여 각 티켓을 분석하고 최적의 에이전트 구성을 결정합니다.
+
+**스마트 할당 플로우:**
+```
+Ticket이 큐에 진입
+    ↓
+[Orchestrator LLM 분석] (Thinking: LOW, 비용 최적화)
+    ├── 티켓 요구사항 분석 (기술 스택, 복잡도, 도메인)
+    ├── 기존 idle 에이전트 중 최적 후보 선택
+    │   └── 적합한 에이전트 없음: 최적 SOUL/SKILLS로 새 에이전트 생성
+    ├── 복잡도 기반 Provider/Model 선택
+    │   ├── 높은 복잡도 → Opus / GPT-4o
+    │   ├── 보통 복잡도 → Sonnet / GPT-4o-mini
+    │   └── 낮은 복잡도 → Haiku / Ollama
+    └── 도구 권한 설정 (보안 정책 적용)
+    ↓
+Agent 구성 완료 및 할당 → 실행 시작
+```
+
+**핵심 컴포넌트:**
+
+| 컴포넌트 | 책임 |
+|-----------|------|
+| `SmartAssignmentService` | LLM이 티켓 분석 → 최적 에이전트 선택/생성 |
+| `AgentConfigurator` | LLM이 티켓별 커스텀 SOUL/SKILLS 생성 |
+| `ModelSelector` | 복잡도 기반 Provider/Model 선택 |
+| `OrchestratorScheduler` | start/stop 라이프사이클 + 주기적 큐 처리 |
+
+**SmartAssignmentService 인터페이스:**
+```typescript
+interface TicketAnalysis {
+  requiredRole: AgentRole;
+  techStack: string[];           // 예: ['TypeScript', 'Stripe', 'PostgreSQL']
+  complexity: 'low' | 'medium' | 'high';
+  requiredTools: string[];       // 예: ['file_write', 'terminal_exec']
+  domain: string;                // 예: 'payment', 'auth', 'frontend-ui'
+  specializations: string[];     // 예: ['API design', 'security']
+}
+
+interface AssignmentResult {
+  agentId: string;
+  isNewAgent: boolean;
+  selectedModel: ResolvedModel;
+  reasoning: string;             // LLM의 할당 이유
+}
+```
+
+**비용 최적화:**
+- 할당 분석에 Thinking Level: LOW 사용 (비용 최소화)
+- 단순 카테고리 매칭이 가능한 경우 LLM 호출 스킵 (폴백 로직)
+- 동일 도메인 티켓에 대한 분석 결과 캐싱
 
 **Ticket 상태 머신 (oh-my-opencode BackgroundManager 패턴 + CEO↔PM 승인):**
 ```

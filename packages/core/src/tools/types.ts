@@ -38,6 +38,8 @@ export interface ToolExecutionContext {
   workingDirectory: string;
   /** Execution timeout in milliseconds */
   timeout?: number;
+  /** Security policy for path and command validation */
+  securityPolicy?: import('./security-policy.js').SecurityPolicy;
 }
 
 // ---------------------------------------------------------------------------

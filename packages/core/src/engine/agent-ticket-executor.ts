@@ -4,12 +4,28 @@
  */
 import type { Ticket } from '../db/schema.js';
 import type { AgentExecutor } from '../agents/agent-executor.js';
-import type { AgentConfig, AgentRole } from '../agents/types.js';
+import type { AgentConfig, AgentRole, AgentExecutionResult } from '../agents/types.js';
 import type { SoulLoader } from '../agents/soul-loader.js';
 import type { ResolvedModel, ThinkingLevel } from '../llm/types.js';
 import type { AgentToolPermissions } from '../tools/types.js';
 import type { TicketExecutor } from './orchestrator.js';
 import type { BranchManager } from './branch-manager.js';
+
+// ---------------------------------------------------------------------------
+// Post-Execution Hook
+// ---------------------------------------------------------------------------
+
+/**
+ * Hook called after agent execution completes (success or failure).
+ * Used for cross-cutting concerns like MEMORY.md updates, logging, etc.
+ */
+export interface PostExecutionHook {
+  onComplete(context: {
+    role: AgentRole;
+    result: AgentExecutionResult;
+    ticketId: string;
+  }): Promise<void>;
+}
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -84,6 +100,8 @@ export class DefaultAgentConfigResolver implements AgentConfigResolver {
 // ---------------------------------------------------------------------------
 
 export class AgentTicketExecutor implements TicketExecutor {
+  private readonly postExecutionHooks: PostExecutionHook[] = [];
+
   constructor(
     private readonly agentExecutor: AgentExecutor,
     private readonly branchManager: BranchManager,
@@ -92,12 +110,18 @@ export class AgentTicketExecutor implements TicketExecutor {
     private readonly configResolver: AgentConfigResolver = new DefaultAgentConfigResolver(),
   ) {}
 
+  /** Register a hook to be called after each ticket execution */
+  addPostExecutionHook(hook: PostExecutionHook): void {
+    this.postExecutionHooks.push(hook);
+  }
+
   /**
    * Execute a ticket by:
    * 1. Creating an isolated branch
    * 2. Building agent config from ticket context
    * 3. Running the agent
-   * 4. Converting result to TicketExecutor format
+   * 4. Running post-execution hooks
+   * 5. Converting result to TicketExecutor format
    */
   async execute(ticket: Ticket): Promise<{ success: boolean; error?: string }> {
     try {
@@ -114,6 +138,19 @@ export class AgentTicketExecutor implements TicketExecutor {
 
       // Execute agent
       const result = await this.agentExecutor.run(agentConfig, task);
+
+      // Run post-execution hooks (fire-and-forget, don't fail the ticket)
+      for (const hook of this.postExecutionHooks) {
+        try {
+          await hook.onComplete({
+            role: resolved.role,
+            result,
+            ticketId: ticket.id,
+          });
+        } catch {
+          // Hook failure should not affect ticket result
+        }
+      }
 
       if (result.status === 'completed') {
         return { success: true };

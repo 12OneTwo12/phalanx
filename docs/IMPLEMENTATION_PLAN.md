@@ -43,10 +43,15 @@
 │  └──────────────┬───────────────────────────────────────┘   │
 │                 │                                            │
 │  ┌──────────────┴───────────────────────────────────────┐   │
-│  │              Orchestrator                             │   │
+│  │              Orchestrator (LLM-Enhanced)               │   │
 │  │  ┌─────────────┐ ┌──────────────┐ ┌──────────────┐  │   │
-│  │  │  Ticket      │ │  Verification│ │  PR Control  │  │   │
-│  │  │  Assignment  │ │  Loop        │ │  (3 modes)   │  │   │
+│  │  │  Smart       │ │  Agent       │ │  Model       │  │   │
+│  │  │  Assignment  │ │  Configurator│ │  Selector    │  │   │
+│  │  │  (LLM)       │ │  (LLM)       │ │  (rules)     │  │   │
+│  │  └─────────────┘ └──────────────┘ └──────────────┘  │   │
+│  │  ┌─────────────┐ ┌──────────────┐ ┌──────────────┐  │   │
+│  │  │  Scheduler   │ │  Verification│ │  PR Control  │  │   │
+│  │  │  + Queue     │ │  Loop        │ │  (3 modes)   │  │   │
 │  │  └─────────────┘ └──────────────┘ └──────────────┘  │   │
 │  └──────────────┬───────────────────────────────────────┘   │
 │                 │                                            │
@@ -187,6 +192,24 @@ agents/{agent-id}/
 
 **Reference:** oh-my-opencode Prometheus → plan → Atlas execution pattern
 
+#### 3.4.1 Team Lead vs Orchestrator: Role Separation
+
+| Aspect | Team Lead (PM Agent) | Orchestrator (LLM-Enhanced Engine) |
+|--------|---------------------|-----------------------------------|
+| **Nature** | LLM-powered AI agent | LLM reasoning + system code hybrid |
+| **Focus** | What to do (planning) | Who & How to execute |
+| **Goal Decomposition** | Goal → Epic → Ticket (LLM) | — |
+| **Agent Assignment** | — | LLM-based ticket analysis → optimal agent selection/creation |
+| **Agent Creation** | — | LLM generates custom SOUL/SKILLS per ticket |
+| **Model Selection** | — | Complexity-based optimal Provider/Model |
+| **Heartbeat** | Context analysis + report generation | Scheduler management |
+| **Proposals** | Generate proposals (LLM) | Execute approved proposals |
+| **Verification** | — | QA verification pipeline |
+| **PR Control** | — | PR creation + merge decisions |
+| **User Communication** | Direct Channel conversations | — |
+
+#### 3.4.2 Goal → Ticket Decomposition Process (CEO↔PM Model)
+
 **Goal → Ticket Decomposition Process (CEO↔PM Model):**
 ```
 1. User (CEO) inputs Goal (e.g., "Complete MVP shopping mall within 3 weeks")
@@ -198,12 +221,67 @@ agents/{agent-id}/
 4. Second-level decomposition: Epic → Tickets (actionable units)
 5. Submit decomposition result to user → await approval
    - [Approve All] [Modify & Approve] [Reject]
-6. After user approval → assign Agents to Tickets + select models
-7. Save to SQLite + reflect on Dashboard → autonomous execution begins
+6. After user approval → Tickets enter Orchestrator queue
+7. Orchestrator performs LLM-powered smart assignment (see 3.4.3)
+8. Save to SQLite + reflect on Dashboard → autonomous execution begins
 
 * Already approved Tickets are executed autonomously by Agents (no user intervention needed)
 * Team Lead can also make Reverse Proposals ("How about we also do this?" → execute after user approval)
 ```
+
+#### 3.4.3 Orchestrator: LLM Smart Assignment & Agent Auto-Creation
+
+The Orchestrator uses LLM reasoning (Thinking Level: LOW for cost optimization) to analyze each ticket and determine the optimal agent configuration.
+
+**Smart Assignment Flow:**
+```
+Ticket enters queue
+    ↓
+[Orchestrator LLM Analysis] (Thinking: LOW, cost-optimized)
+    ├── Analyze ticket requirements (tech stack, complexity, domain)
+    ├── Select best candidate from existing idle agents
+    │   └── No match: Create new agent with optimized SOUL/SKILLS
+    ├── Select Provider/Model based on complexity
+    │   ├── High complexity → Opus / GPT-4o
+    │   ├── Medium complexity → Sonnet / GPT-4o-mini
+    │   └── Low complexity → Haiku / Ollama
+    └── Configure tool permissions (security policy applied)
+    ↓
+Agent configured and assigned → execution begins
+```
+
+**Core Components:**
+
+| Component | Responsibility |
+|-----------|---------------|
+| `SmartAssignmentService` | LLM analyzes ticket → selects/creates optimal agent |
+| `AgentConfigurator` | LLM generates custom SOUL/SKILLS per ticket |
+| `ModelSelector` | Complexity-based Provider/Model selection |
+| `OrchestratorScheduler` | Periodic queue processing with start/stop lifecycle |
+
+**SmartAssignmentService Interface:**
+```typescript
+interface TicketAnalysis {
+  requiredRole: AgentRole;
+  techStack: string[];           // e.g., ['TypeScript', 'Stripe', 'PostgreSQL']
+  complexity: 'low' | 'medium' | 'high';
+  requiredTools: string[];       // e.g., ['file_write', 'terminal_exec']
+  domain: string;                // e.g., 'payment', 'auth', 'frontend-ui'
+  specializations: string[];     // e.g., ['API design', 'security']
+}
+
+interface AssignmentResult {
+  agentId: string;
+  isNewAgent: boolean;
+  selectedModel: ResolvedModel;
+  reasoning: string;             // LLM's assignment rationale
+}
+```
+
+**Cost Optimization:**
+- Assignment analysis uses Thinking Level: LOW (minimal cost)
+- Skip LLM call when simple category matching suffices (fallback logic)
+- Cache analysis results for same-domain tickets
 
 **Ticket State Machine (oh-my-opencode BackgroundManager pattern + CEO↔PM approval):**
 ```

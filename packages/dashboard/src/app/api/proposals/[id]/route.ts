@@ -43,16 +43,25 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
   // Standard proposals
   const repo = getProposalRepository();
-  const updated = repo.update(id, { status: body.status });
-  if (!updated) return errorResponse('Proposal not found', 404);
+  const proposal = repo.findById(id);
+  if (!proposal) return errorResponse('Proposal not found', 404);
 
-  // Execute side-effects when approved
-  let executionResult;
+  // Execute side-effects when approved (executor handles the status transition)
   if (body.status === 'approved') {
     const executor = new ProposalExecutor(repo, getTicketRepository());
-    executionResult = executor.execute(id);
+    const executionResult = executor.execute(id);
+    const updated = repo.findById(id)!;
+
+    eventBus.emit('proposal:updated', { proposalId: id, status: body.status });
+
+    if (!executionResult.success) {
+      return jsonResponse({ ...updated, execution: executionResult }, 422);
+    }
+    return jsonResponse({ ...updated, execution: executionResult });
   }
 
+  // Rejection — just update status
+  const updated = repo.update(id, { status: body.status });
   eventBus.emit('proposal:updated', { proposalId: id, status: body.status });
-  return jsonResponse({ ...updated, execution: executionResult });
+  return jsonResponse(updated);
 }

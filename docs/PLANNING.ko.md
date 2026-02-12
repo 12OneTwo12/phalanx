@@ -26,19 +26,42 @@
               ↓
       [Team Lead Agent] ← Heartbeat (내장 스케줄러)
               ↓
-      Goal을 티켓(Ticket)으로 분해
+      Goal을 Epic → Ticket으로 분해 (LLM)
+      사용자에게 계획 제출 → [승인] [수정] [거부]
+              ↓
+      [Orchestrator] ← 승인된 티켓이 실행 큐에 진입
+              ↓
+      LLM이 각 Ticket 분석 → 최적 Agent 선택/생성
+      티켓별 SOUL/SKILLS/Model 구성 (LLM 최적화)
          ↓        ↓        ↓
-      티켓 #1   티켓 #2   티켓 #3
+      Agent #1   Agent #2   Agent #3
          ↓        ↓        ↓
-      LLM Provider (Claude / OpenAI / Ollama / 등)
-      Agent별 Provider & 모델 선택 가능
+      각 Agent는 최적으로 선택된 Provider & Model 사용
          ↓        ↓        ↓
       코드 작성 → QA 검증 → Customer 검증
          ↓        ↓        ↓
       PR 생성 → 사용자 승인 or AI 자동 Merge
               ↓
+      Goal 진행률 업데이트 → 다음 Ticket or Goal 완료
+              ↓
    [보고] → Slack / Discord / Dashboard (내장)
 ```
+
+### Team Lead vs Orchestrator: 역할 분리
+
+| 구분 | Team Lead (PM Agent) | Orchestrator (LLM 강화 엔진) |
+|------|---------------------|-------------------------------|
+| **본질** | LLM 기반 AI 에이전트 | LLM 추론 + 시스템 코드 하이브리드 |
+| **역할** | 무엇을 할지 (기획) | 누가, 어떻게 실행할지 |
+| **Goal 분해** | Goal → Epic → Ticket (LLM) | — |
+| **에이전트 할당** | — | LLM 기반 티켓 분석 → 최적 에이전트 선택/생성 |
+| **에이전트 생성** | — | LLM이 티켓별 커스텀 SOUL/SKILLS 생성 |
+| **모델 선택** | — | 복잡도 기반 최적 Provider/Model |
+| **Heartbeat** | 컨텍스트 분석 + 보고서 생성 | 스케줄러 관리 |
+| **제안** | 제안 생성 (LLM) | 승인된 제안 실행 |
+| **검증** | — | QA 검증 파이프라인 |
+| **PR 관리** | — | PR 생성 + 머지 결정 |
+| **사용자 소통** | Direct Channel 대화 | — |
 
 ### 핵심 차별점
 
@@ -323,16 +346,28 @@ interface AgentLLM {
 ┌─────────────────────────────────────────────────────────┐
 │              Ticket Execution Flow                        │
 │                                                         │
-│  1. Team Lead가 Goal에서 티켓(Ticket) 분해               │
+│  1. Team Lead가 Goal을 Epic → Ticket으로 분해            │
+│     → 사용자에게 승인 요청                               │
 │     ↓                                                   │
-│  2. 티켓별로 Agent 배정 + LLM Provider 호출              │
+│  2. 사용자 승인 → 티켓이 Orchestrator 큐에 진입          │
+│     ↓                                                   │
+│  3. Orchestrator가 각 Ticket을 LLM으로 분석:             │
+│     - 필요한 역할, 기술 스택, 복잡도 결정                │
+│     - 최적 Agent 선택 또는 생성                          │
+│     - 해당 티켓에 맞는 SOUL/SKILLS 구성                  │
+│     - 작업에 최적인 Provider/Model 선택                  │
 │     ┌──────────────────────────────────────────────┐    │
 │     │  티켓: "결제 API 구현"                         │    │
 │     │                                               │    │
-│     │  담당 Agent: backend-dev                      │    │
+│     │  Orchestrator 분석:                           │    │
+│     │    역할: backend, 도메인: payment              │    │
+│     │    복잡도: high → 모델: Claude Opus            │    │
+│     │                                               │    │
+│     │  생성/선택된 Agent: payment-specialist          │    │
 │     │    Provider: Claude API                       │    │
-│     │    Model: Sonnet                              │    │
-│     │    Soul: SOUL.md (개성 주입)                   │    │
+│     │    Model: Opus (높은 복잡도)                   │    │
+│     │    Soul: 커스텀 SOUL.md (결제 전문가)           │    │
+│     │    Skills: Stripe, PG 연동, 보안               │    │
 │     │                                               │    │
 │     │  사용 도구:                                    │    │
 │     │    - 파일 읽기/쓰기 (fs)                       │    │
@@ -341,9 +376,9 @@ interface AgentLLM {
 │     │    - GitHub PR (octokit)                      │    │
 │     └──────────────────────────────────────────────┘    │
 │     ↓                                                   │
-│  3. Agent가 코드 작성 → QA 검증 → Customer 검증         │
+│  4. Agent가 코드 작성 → QA 검증 → Customer 검증         │
 │     ↓                                                   │
-│  4. branch 생성 → PR 생성                               │
+│  5. branch 생성 → PR 생성                               │
 │     ↓                                                   │
 │  5-A. Manual Mode → 사용자가 PR Review 후 Merge         │
 │  5-B. Smart Mode → AI가 판단하여 자동 Merge or 대기     │
@@ -359,7 +394,7 @@ interface AgentLLM {
 
 #### 4.2.5 Agent 역할별 구성
 
-| Agent 역할 | 하는 일 | 권장 모델 | 도구 |
+| Agent 역할 | 하는 일 | 기본 모델 | 도구 |
 |-----------|--------|----------|------|
 | **Team Lead** | Goal→티켓 분해, 우선순위, Heartbeat | 고성능 모델 (Opus/GPT-4o) | LLM API 직접 호출 |
 | **Backend Agent** | API, 서버 코드, DB 스키마 작성 | 균형 모델 (Sonnet/GPT-4o) | 파일, Git, 터미널, GitHub |
@@ -367,6 +402,8 @@ interface AgentLLM {
 | **QA Agent** | 테스트 작성/실행, 코드 품질 체크 | 경량 모델 (Haiku/GPT-4o-mini) | 파일, 터미널 |
 | **Customer Agent** | 사용자 관점 UX 검증, 피드백 | 경량 모델 (Haiku/GPT-4o-mini) | 파일, 터미널 |
 | **DevOps Agent** | CI/CD, 배포 설정 | 균형 모델 (Sonnet/GPT-4o) | 파일, Git, 터미널 |
+
+> **참고:** 위 모델은 기본값입니다. Orchestrator의 `ModelSelector`가 티켓 복잡도 분석에 따라 동적으로 모델을 변경합니다 (high → Opus, medium → Sonnet, low → Haiku). 사용자도 Dashboard에서 Agent별로 직접 변경할 수 있습니다.
 
 **사용자는 Dashboard에서 Agent별 Provider와 모델을 변경할 수 있다:**
 

@@ -3,6 +3,9 @@
  * Uses Strategy pattern with extensible ConventionRule interface.
  */
 import type { ConventionRule, ConventionViolation, ValidationResult, FileChange } from './types.js';
+import { NoTodoRule } from './rules/no-todo-rule.js';
+import { MaxFileSizeRule } from './rules/max-file-size-rule.js';
+import { TestFileNamingRule } from './rules/test-file-naming-rule.js';
 
 // ---------------------------------------------------------------------------
 // Built-in rules
@@ -119,5 +122,8 @@ export function createDefaultValidator(): ConventionValidator {
   return new ConventionValidator([
     new KebabCaseFileRule(),
     new NoConsoleLogRule(),
+    new NoTodoRule(),
+    new MaxFileSizeRule(),
+    new TestFileNamingRule(),
   ]);
 }
