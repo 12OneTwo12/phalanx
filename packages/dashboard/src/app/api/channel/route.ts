@@ -1,19 +1,14 @@
 import { jsonResponse, errorResponse, newId, parseBody } from '@/lib/api-utils';
-import { getActivityLogRepository } from '@/lib/db';
+import { getActivityLogRepository, getChannelMessageRepository } from '@/lib/db';
 import { eventBus } from '@/lib/event-bus';
 
-/** In-memory message store for the direct channel (simple approach for MVP) */
-const messages: ChannelMessage[] = [];
-
-export interface ChannelMessage {
-  id: string;
-  role: 'user' | 'team-lead';
-  content: string;
-  timestamp: string;
-}
-
 /** GET /api/channel — get all channel messages */
-export async function GET() {
+export async function GET(request: Request) {
+  const repo = getChannelMessageRepository();
+  const { searchParams } = new URL(request.url);
+  const limit = Number(searchParams.get('limit') ?? 100);
+  const offset = Number(searchParams.get('offset') ?? 0);
+  const messages = repo.findAll({ limit, offset });
   return jsonResponse(messages);
 }
 
@@ -24,14 +19,12 @@ export async function POST(request: Request) {
     return errorResponse('content is required');
   }
 
-  const message: ChannelMessage = {
+  const repo = getChannelMessageRepository();
+  const message = repo.create({
     id: newId(),
     role: body.role ?? 'user',
     content: body.content.trim(),
-    timestamp: new Date().toISOString(),
-  };
-
-  messages.push(message);
+  });
 
   // Log the message as an activity
   try {
