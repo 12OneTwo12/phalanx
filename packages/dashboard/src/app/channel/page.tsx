@@ -10,6 +10,7 @@ export default function ChannelPage() {
   const { data: messages, mutate: refreshMessages } = useSWR<ChannelMessage[]>('/api/channel', fetcher);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-refresh on new messages
@@ -29,12 +30,16 @@ export default function ChannelPage() {
     const text = input.trim();
     if (!text) return;
     setSending(true);
+    setError(null);
     setInput('');
     try {
       await apiPost('/channel', { content: text, role: 'user' });
       // SSE events will trigger refreshMessages automatically,
       // but also refresh manually to ensure immediate display
       await refreshMessages();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send message');
+      setInput(text); // restore input so user can retry
     } finally {
       setSending(false);
     }
@@ -78,6 +83,13 @@ export default function ChannelPage() {
           </div>
         )}
       </div>
+
+      {/* Error display */}
+      {error && (
+        <div className="mt-2 rounded-md border border-red-800 bg-red-900/30 px-3 py-2 text-sm text-red-300">
+          {error}
+        </div>
+      )}
 
       {/* Input area */}
       <div className="mt-3 flex gap-2">
