@@ -26,19 +26,42 @@ Limitations of current AI Agent tools:
               ↓
       [Team Lead Agent] ← Heartbeat (built-in scheduler)
               ↓
-      Decompose Goal into Tickets
+      Decompose Goal into Epics → Tickets (LLM)
+      Submit plan to User → [Approve] [Modify] [Reject]
+              ↓
+      [Orchestrator] ← Approved tickets enter execution queue
+              ↓
+      LLM analyzes each Ticket → Smart Agent selection/creation
+      Configure SOUL/SKILLS/Model per Ticket (LLM-optimized)
          ↓        ↓        ↓
-      Ticket #1  Ticket #2  Ticket #3
+      Agent #1   Agent #2   Agent #3
          ↓        ↓        ↓
-      LLM Provider (Claude / OpenAI / Ollama / etc.)
-      Each Agent can choose its own Provider & Model
+      Each Agent uses its optimally chosen Provider & Model
          ↓        ↓        ↓
       Write Code → QA Verification → Customer Verification
          ↓        ↓        ↓
       Create PR → User Approval or AI Auto-Merge
               ↓
+      Goal Progress Update → Next Ticket or Goal Complete
+              ↓
    [Report] → Slack / Discord / Dashboard (built-in)
 ```
+
+### Team Lead vs Orchestrator: Clear Role Separation
+
+| Aspect | Team Lead (PM Agent) | Orchestrator (LLM-Enhanced Engine) |
+|--------|---------------------|-----------------------------------|
+| **Nature** | LLM-powered AI agent | LLM reasoning + system code hybrid |
+| **Focus** | What to do (planning) | Who & How to execute |
+| **Goal Decomposition** | Goal → Epic → Ticket (LLM) | — |
+| **Agent Assignment** | — | LLM-based ticket analysis → optimal agent selection/creation |
+| **Agent Creation** | — | LLM generates custom SOUL/SKILLS per ticket |
+| **Model Selection** | — | Complexity-based optimal Provider/Model |
+| **Heartbeat** | Context analysis + report generation | Scheduler management |
+| **Proposals** | Generate proposals (LLM) | Execute approved proposals |
+| **Verification** | — | QA verification pipeline |
+| **PR Control** | — | PR creation + merge decisions |
+| **User Communication** | Direct Channel conversations | — |
 
 ### Key Differentiators
 
@@ -324,16 +347,28 @@ Thanks to this architecture, switching LLM Providers has no impact on the execut
 ┌─────────────────────────────────────────────────────────┐
 │              Ticket Execution Flow                        │
 │                                                         │
-│  1. Team Lead decomposes Goal into Tickets               │
+│  1. Team Lead decomposes Goal into Epics → Tickets       │
+│     → Submit to User for approval                       │
 │     ↓                                                   │
-│  2. Assign Agent per ticket + Call LLM Provider          │
+│  2. User approves → Tickets enter Orchestrator queue     │
+│     ↓                                                   │
+│  3. Orchestrator analyzes each Ticket (LLM):             │
+│     - Determine required role, tech stack, complexity    │
+│     - Select or create optimal Agent                    │
+│     - Configure SOUL/SKILLS for the specific ticket     │
+│     - Choose best Provider/Model for the task           │
 │     ┌──────────────────────────────────────────────┐    │
 │     │  Ticket: "Implement Payment API"              │    │
 │     │                                               │    │
-│     │  Assigned Agent: backend-dev                  │    │
+│     │  Orchestrator Analysis:                       │    │
+│     │    Role: backend, Domain: payment             │    │
+│     │    Complexity: high → Model: Claude Opus      │    │
+│     │                                               │    │
+│     │  Created/Selected Agent: payment-specialist    │    │
 │     │    Provider: Claude API                       │    │
-│     │    Model: Sonnet                              │    │
-│     │    Soul: SOUL.md (personality injection)       │    │
+│     │    Model: Opus (high complexity)              │    │
+│     │    Soul: Custom SOUL.md (payment expert)       │    │
+│     │    Skills: Stripe, PG integration, security   │    │
 │     │                                               │    │
 │     │  Tools used:                                   │    │
 │     │    - File read/write (fs)                      │    │
@@ -342,9 +377,9 @@ Thanks to this architecture, switching LLM Providers has no impact on the execut
 │     │    - GitHub PR (octokit)                       │    │
 │     └──────────────────────────────────────────────┘    │
 │     ↓                                                   │
-│  3. Agent writes code → QA verification → Customer verification│
+│  4. Agent writes code → QA verification → Customer verification│
 │     ↓                                                   │
-│  4. Create branch → Create PR                            │
+│  5. Create branch → Create PR                            │
 │     ↓                                                   │
 │  5-A. Manual Mode → User reviews PR and merges           │
 │  5-B. Smart Mode → AI decides to auto-merge or wait      │
@@ -360,7 +395,7 @@ Thanks to this architecture, switching LLM Providers has no impact on the execut
 
 #### 4.2.5 Agent Role Configuration
 
-| Agent Role | Responsibilities | Recommended Model | Tools |
+| Agent Role | Responsibilities | Default Model | Tools |
 |-----------|--------|----------|------|
 | **Team Lead** | Goal→Ticket decomposition, prioritization, Heartbeat | High-performance model (Opus/GPT-4o) | Direct LLM API calls |
 | **Backend Agent** | API, server code, DB schema | Balanced model (Sonnet/GPT-4o) | File, Git, Terminal, GitHub |
@@ -368,6 +403,8 @@ Thanks to this architecture, switching LLM Providers has no impact on the execut
 | **QA Agent** | Test writing/execution, code quality checks | Lightweight model (Haiku/GPT-4o-mini) | File, Terminal |
 | **Customer Agent** | User-perspective UX verification, feedback | Lightweight model (Haiku/GPT-4o-mini) | File, Terminal |
 | **DevOps Agent** | CI/CD, deployment configuration | Balanced model (Sonnet/GPT-4o) | File, Git, Terminal |
+
+> **Note:** The models listed above are defaults. The Orchestrator's `ModelSelector` dynamically overrides these based on ticket complexity analysis (high → Opus, medium → Sonnet, low → Haiku). Users can also manually override per Agent from the Dashboard.
 
 **Users can change each Agent's Provider and Model from the Dashboard:**
 
