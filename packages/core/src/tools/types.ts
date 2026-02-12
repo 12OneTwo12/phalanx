@@ -10,6 +10,7 @@ export const ToolCategory = z.enum([
   'terminal',
   'github',
   'analysis',
+  'database',
 ]);
 export type ToolCategory = z.infer<typeof ToolCategory>;
 
