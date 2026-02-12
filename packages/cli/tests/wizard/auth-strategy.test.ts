@@ -114,13 +114,13 @@ describe('auth-strategy', () => {
       expect(result.error).toContain('short');
     });
 
-    it('validates with network call on good format', async () => {
-      mockFetch.mockResolvedValue({ ok: true, status: 200 });
+    it('validates format-only (no network) for good token', async () => {
       const strategy = new SetupTokenAuthStrategy();
       const token = 'sk-ant-oat01-' + 'a'.repeat(80);
       const result = await strategy.validate({ secret: token, authMode: 'token' });
       expect(result.valid).toBe(true);
-      expect(mockFetch).toHaveBeenCalled();
+      // Setup-tokens have user:inference scope only — no network validation
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it('has correct metadata', () => {

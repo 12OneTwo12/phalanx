@@ -94,30 +94,10 @@ const SETUP_TOKEN_PREFIX = 'sk-ant-oat01-';
 const SETUP_TOKEN_MIN_LENGTH = 80;
 
 /**
- * Validate an Anthropic setup-token (OAuth access token) via Bearer auth.
- * Setup-tokens (prefix sk-ant-oat01-) use Authorization: Bearer, NOT x-api-key.
- */
-export async function validateAnthropicToken(token: string): Promise<ValidationResult> {
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/models', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'anthropic-version': '2023-06-01',
-      },
-      signal: withTimeout(TIMEOUT_MS),
-    });
-    if (res.ok) return { valid: true };
-    if (res.status === 401) return { valid: false, error: 'Invalid or expired token' };
-    return { valid: false, error: `HTTP ${res.status}` };
-  } catch (err) {
-    return { valid: false, error: err instanceof Error ? err.message : 'Connection failed' };
-  }
-}
-
-/**
  * Validate Anthropic setup-token format (prefix + minimum length).
- * No network call — use validateAnthropicToken() for full validation.
+ * No network call — setup-tokens have `user:inference` scope only
+ * and cannot access /v1/models, so format validation is all we can do.
+ * This matches OpenClaw's approach (validateAnthropicSetupToken).
  */
 export function validateSetupTokenFormat(token: string): ValidationResult {
   if (!token.startsWith(SETUP_TOKEN_PREFIX)) {

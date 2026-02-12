@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   validateAnthropicKey,
-  validateAnthropicToken,
   validateOpenAIKey,
   validateGeminiKey,
   validateOllamaConnection,
@@ -51,32 +50,6 @@ describe('provider-validator', () => {
     it('returns error on network failure', async () => {
       mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
       const result = await validateAnthropicKey('key');
-      expect(result).toEqual({ valid: false, error: 'ECONNREFUSED' });
-    });
-  });
-
-  describe('validateAnthropicToken', () => {
-    it('returns valid on 200 with Bearer auth', async () => {
-      mockFetch.mockResolvedValue({ ok: true, status: 200 });
-      const result = await validateAnthropicToken('sk-ant-oat01-test');
-      expect(result).toEqual({ valid: true });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.anthropic.com/v1/models',
-        expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: 'Bearer sk-ant-oat01-test' }),
-        }),
-      );
-    });
-
-    it('returns invalid on 401', async () => {
-      mockFetch.mockResolvedValue({ ok: false, status: 401 });
-      const result = await validateAnthropicToken('bad-token');
-      expect(result).toEqual({ valid: false, error: 'Invalid or expired token' });
-    });
-
-    it('returns error on network failure', async () => {
-      mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
-      const result = await validateAnthropicToken('token');
       expect(result).toEqual({ valid: false, error: 'ECONNREFUSED' });
     });
   });

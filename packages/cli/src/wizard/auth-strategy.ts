@@ -11,7 +11,6 @@ import type { ProviderAuthMode } from '@phalanx/core';
 import type { ValidationResult } from './provider-validator.js';
 import {
   validateAnthropicKey,
-  validateAnthropicToken,
   validateOpenAIKey,
   validateGeminiKey,
   validateSetupTokenFormat,
@@ -141,12 +140,9 @@ export class SetupTokenAuthStrategy implements AuthStrategy {
   }
 
   async validate(credential: AuthCredential): Promise<ValidationResult> {
-    // Format check first (fast fail)
-    const formatResult = validateSetupTokenFormat(credential.secret);
-    if (!formatResult.valid) return formatResult;
-
-    // Network validation — setup-tokens are OAuth tokens, use Bearer auth
-    return validateAnthropicToken(credential.secret);
+    // Format-only validation — setup-tokens have user:inference scope only
+    // and cannot access /v1/models. This matches OpenClaw's approach.
+    return validateSetupTokenFormat(credential.secret);
   }
 }
 
