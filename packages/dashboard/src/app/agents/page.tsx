@@ -4,6 +4,7 @@ import useSWR from 'swr';
 import { fetcher } from '@/lib/api-client';
 import type { Agent } from '@phalanx/core';
 import Link from 'next/link';
+import { useTicketTitles } from '@/hooks/use-ticket-titles';
 
 const STATUS_INDICATOR: Record<string, string> = {
   idle: 'bg-gray-500',
@@ -24,6 +25,7 @@ const ROLE_ICONS: Record<string, string> = {
 
 export default function AgentsPage() {
   const { data: agents, isLoading } = useSWR<Agent[]>('/api/agents', fetcher);
+  const ticketTitles = useTicketTitles();
 
   return (
     <div>
@@ -51,8 +53,8 @@ export default function AgentsPage() {
                 </div>
               </div>
               {agent.currentTicketId && (
-                <p className="mt-2 text-xs text-gray-500">
-                  Working on: <span className="text-gray-400">{agent.currentTicketId}</span>
+                <p className="mt-2 truncate text-xs text-gray-500">
+                  Working on: <span className="text-gray-400">{ticketTitles.get(agent.currentTicketId) ?? agent.currentTicketId}</span>
                 </p>
               )}
               {agent.model && (

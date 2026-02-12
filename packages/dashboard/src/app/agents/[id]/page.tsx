@@ -6,6 +6,7 @@ import { fetcher } from '@/lib/api-client';
 import type { Agent } from '@phalanx/core';
 import Link from 'next/link';
 import { SoulEditor } from '@/components/soul-editor';
+import { useTicketTitles } from '@/hooks/use-ticket-titles';
 
 const STATUS_BADGE: Record<string, string> = {
   idle: 'bg-gray-500/20 text-gray-400',
@@ -18,6 +19,7 @@ const STATUS_BADGE: Record<string, string> = {
 export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: agent, isLoading } = useSWR<Agent>(`/api/agents/${id}`, fetcher);
+  const ticketTitles = useTicketTitles();
 
   if (isLoading) return <p className="text-gray-500">Loading...</p>;
   if (!agent) return <p className="text-gray-500">Agent not found</p>;
@@ -39,7 +41,10 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
         </div>
         {agent.currentTicketId && (
           <p className="mt-2 text-sm text-gray-400">
-            Currently working on: <span className="font-mono text-gray-300">{agent.currentTicketId}</span>
+            Currently working on:{' '}
+            <Link href={`/tickets/${agent.currentTicketId}`} className="text-gray-300 hover:text-blue-400">
+              {ticketTitles.get(agent.currentTicketId) ?? agent.currentTicketId}
+            </Link>
           </p>
         )}
       </div>
