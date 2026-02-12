@@ -5,6 +5,7 @@
  */
 import {
   DatabaseManager,
+  migrateUp,
   GoalRepository,
   EpicRepository,
   TicketRepository,
@@ -19,9 +20,16 @@ import {
 
 const DB_PATH = process.env.PHALANX_DB_PATH ?? 'phalanx.db';
 
-/** Get (or create) the singleton DatabaseManager */
+let migrated = false;
+
+/** Get (or create) the singleton DatabaseManager, running migrations on first call */
 export function getDb(): DatabaseManager {
-  return DatabaseManager.getInstance({ path: DB_PATH });
+  const db = DatabaseManager.getInstance({ path: DB_PATH });
+  if (!migrated) {
+    migrateUp(db);
+    migrated = true;
+  }
+  return db;
 }
 
 /** Pre-built repository accessors */
