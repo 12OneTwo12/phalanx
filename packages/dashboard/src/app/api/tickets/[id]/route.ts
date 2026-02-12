@@ -41,7 +41,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const updated = repo.update(id, sanitized);
     if (!updated) return errorResponse('Ticket not found', 404);
     return jsonResponse(updated);
-  } catch (err) {
+  } catch {
     return errorResponse('Failed to update ticket', 500);
   }
 }

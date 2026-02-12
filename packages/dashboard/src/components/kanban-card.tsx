@@ -27,7 +27,7 @@ export function KanbanCard({ ticket }: KanbanCardProps) {
     try {
       await apiPatch(`/tickets/${ticket.id}`, { status: 'backlog', approvedAt: new Date().toISOString() });
       await mutate('/api/tickets');
-    } catch (err) {
+    } catch {
       setActionError('Failed to approve ticket');
     } finally {
       setLoading(false);
@@ -40,7 +40,7 @@ export function KanbanCard({ ticket }: KanbanCardProps) {
     try {
       await apiPatch(`/tickets/${ticket.id}`, { status: 'failed' });
       await mutate('/api/tickets');
-    } catch (err) {
+    } catch {
       setActionError('Failed to reject ticket');
     } finally {
       setLoading(false);

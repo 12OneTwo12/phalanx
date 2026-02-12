@@ -42,13 +42,11 @@ describe('EventBus — edge cases', () => {
 
   it('should handle unsubscribe during emit (subscriber removes itself)', async () => {
     const { eventBus } = await import('../event-bus');
-    let unsub: () => void;
-    const selfRemover = vi.fn(() => {
-      unsub();
-    });
+    const selfRemover = vi.fn();
     const afterHandler = vi.fn();
 
-    unsub = eventBus.subscribe(selfRemover);
+    const unsub = eventBus.subscribe(selfRemover);
+    selfRemover.mockImplementation(() => unsub());
     const unsub2 = eventBus.subscribe(afterHandler);
 
     // Set iterates in insertion order; removing during iteration
