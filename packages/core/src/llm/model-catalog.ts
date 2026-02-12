@@ -12,9 +12,9 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
   // Anthropic models
   // -------------------------------------------------------------------------
   {
-    fullId: 'anthropic/claude-opus-4-6-20250414',
-    id: 'claude-opus-4-6-20250414',
-    name: 'Claude Opus 4.6',
+    fullId: 'anthropic/claude-opus-4-20250514',
+    id: 'claude-opus-4-20250514',
+    name: 'Claude Opus 4',
     provider: 'anthropic',
     api: 'anthropic-messages',
     reasoning: false,
@@ -190,7 +190,7 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
  */
 export function isModelMatch(model: string, entryId: string): boolean {
   if (model === entryId) return true;
-  // model has version suffix beyond entry (e.g., model='claude-opus-4-6-20250414-xxx', entry='claude-opus-4-6-20250414')
+  // model has version suffix beyond entry (e.g., model='claude-opus-4-20250514-xxx', entry='claude-opus-4-20250514')
   if (model.startsWith(entryId + '-')) return true;
   // entry has version suffix beyond model (e.g., model='claude-sonnet-4-5', entry='claude-sonnet-4-5-20250929')
   if (entryId.startsWith(model + '-')) {

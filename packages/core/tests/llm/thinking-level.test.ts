@@ -50,7 +50,7 @@ describe('supportsThinking', () => {
   });
 
   it('returns true for prefix matches', () => {
-    expect(supportsThinking('claude-opus-4-6-20250414')).toBe(true);
+    expect(supportsThinking('claude-opus-4-20250514')).toBe(true);
     expect(supportsThinking('claude-sonnet-4-5-20250929')).toBe(true);
   });
 
@@ -63,15 +63,15 @@ describe('supportsThinking', () => {
 
 describe('effectiveThinkingLevel', () => {
   it('returns off when requested is undefined', () => {
-    expect(effectiveThinkingLevel(undefined, 'claude-opus-4-6-20250414')).toBe('off');
+    expect(effectiveThinkingLevel(undefined, 'claude-opus-4-20250514')).toBe('off');
   });
 
   it('returns off when requested is off', () => {
-    expect(effectiveThinkingLevel('off', 'claude-opus-4-6-20250414')).toBe('off');
+    expect(effectiveThinkingLevel('off', 'claude-opus-4-20250514')).toBe('off');
   });
 
   it('returns requested level for thinking-capable model', () => {
-    expect(effectiveThinkingLevel('high', 'claude-opus-4-6-20250414')).toBe('high');
+    expect(effectiveThinkingLevel('high', 'claude-opus-4-20250514')).toBe('high');
     expect(effectiveThinkingLevel('medium', 'o3')).toBe('medium');
   });
 

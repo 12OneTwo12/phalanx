@@ -25,14 +25,15 @@ import {
   DefaultAgentConfigResolver,
   BranchManager,
   injectConventions,
-  type TicketExecutor,
   createLLMStack,
   SoulLoader,
   AgentExecutor,
   ToolRegistry,
   BUILTIN_TOOLS,
   HeartbeatService,
+  MemoryUpdateHook,
 } from '@phalanx/core';
+import * as fs from 'node:fs/promises';
 import {
   getTicketRepository,
   getAgentRepository,
@@ -145,13 +146,20 @@ function createDaemonWiring(): DaemonState {
     projectRoot,
   );
 
-  const ticketExecutor: TicketExecutor = new AgentTicketExecutor(
+  const ticketExecutor = new AgentTicketExecutor(
     agentExecutor,
     branchManager,
     executorConfig,
     soulLoader,
     new DefaultAgentConfigResolver(),
   );
+
+  // Wire MemoryUpdateHook so agents persist learnings to MEMORY.md
+  const memoryFs = {
+    readFile: (path: string) => fs.readFile(path, 'utf-8'),
+    writeFile: (path: string, content: string) => fs.writeFile(path, content, 'utf-8'),
+  };
+  ticketExecutor.addPostExecutionHook(new MemoryUpdateHook(templatesDir, memoryFs));
 
   // Engine services
   const orchestrator = new Orchestrator(ticketRepo, ticketExecutor);
