@@ -5,6 +5,7 @@
  */
 import { Command } from 'commander';
 import { resolve } from 'node:path';
+import { createConnection } from 'node:net';
 import { logger } from '../utils/logger.js';
 import { loadConfig } from '../utils/config-loader.js';
 import { createDaemonService } from './daemon-factory.js';
@@ -19,6 +20,30 @@ function resolveCliEntryPath(): string {
     throw new Error('Unable to resolve CLI entry point path');
   }
   return resolve(argv1);
+}
+
+/**
+ * Wait until a TCP port is accepting connections.
+ */
+function waitForPort(port: number, timeoutMs: number): Promise<boolean> {
+  const start = Date.now();
+  return new Promise((resolve) => {
+    function attempt() {
+      if (Date.now() - start > timeoutMs) {
+        resolve(false);
+        return;
+      }
+      const socket = createConnection({ port, host: '127.0.0.1' }, () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.on('error', () => {
+        socket.destroy();
+        setTimeout(attempt, 1000);
+      });
+    }
+    attempt();
+  });
 }
 
 export const startCommand = new Command('start')
@@ -50,7 +75,15 @@ export const startCommand = new Command('start')
       });
       await service.start();
       logger.success('Daemon started.');
-      logger.info(`Dashboard: http://localhost:${config.dashboardPort}`);
+
+      const port = config.dashboardPort;
+      const ready = await waitForPort(port, 30_000);
+      if (ready) {
+        logger.success(`Dashboard ready: http://localhost:${port}`);
+      } else {
+        logger.warn(`Dashboard is starting on port ${port} (may take a few more seconds).`);
+        logger.dim(`Check logs: ${resolve(config.projectRoot, config.logPath)}`);
+      }
     } catch (err) {
       logger.error(`Failed to start daemon: ${err instanceof Error ? err.message : String(err)}`);
       process.exitCode = 1;
