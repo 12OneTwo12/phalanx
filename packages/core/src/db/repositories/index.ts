@@ -18,3 +18,7 @@ export { DecisionRecordRepository } from './decision-record.repository.js';
 export { KnowledgeEntryRepository } from './knowledge-entry.repository.js';
 export { ChannelMessageRepository } from './channel-message.repository.js';
 export { TicketCommentRepository } from './ticket-comment.repository.js';
+export { DebateRepository } from './debate.repository.js';
+export { DebateArgumentRepository } from './debate-argument.repository.js';
+export { MeetingRepository } from './meeting.repository.js';
+export { MeetingParticipantRepository } from './meeting-participant.repository.js';
