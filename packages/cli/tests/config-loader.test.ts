@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { initConfig, loadConfig, saveConfig, findProjectRoot } from '../src/utils/config-loader.js';
+import { initConfig, loadConfig, saveConfig, findProjectRoot, DEFAULT_MODEL } from '../src/utils/config-loader.js';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -29,7 +29,7 @@ describe('config-loader', () => {
       const config = initConfig(tempDir);
 
       expect(config.llm).toEqual({
-        systemDefault: 'anthropic/claude-sonnet-4-5-20250929',
+        systemDefault: DEFAULT_MODEL,
         providers: {},
       });
       expect(config.daemon).toEqual({ autoStart: false });
@@ -52,7 +52,7 @@ describe('config-loader', () => {
     it('should load llm and daemon fields', () => {
       initConfig(tempDir);
       const config = loadConfig(tempDir)!;
-      expect(config.llm.systemDefault).toBe('anthropic/claude-sonnet-4-5-20250929');
+      expect(config.llm.systemDefault).toBe(DEFAULT_MODEL);
       expect(config.llm.providers).toEqual({});
       expect(config.daemon.autoStart).toBe(false);
     });
@@ -66,7 +66,7 @@ describe('config-loader', () => {
 
       const config = loadConfig(tempDir)!;
       expect(config.dbPath).toBe('.phalanx/test.db');
-      expect(config.llm.systemDefault).toBe('anthropic/claude-sonnet-4-5-20250929');
+      expect(config.llm.systemDefault).toBe(DEFAULT_MODEL);
       expect(config.daemon.autoStart).toBe(false);
     });
   });

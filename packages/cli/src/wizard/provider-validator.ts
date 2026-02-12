@@ -58,6 +58,8 @@ export async function validateOpenAIKey(apiKey: string): Promise<ValidationResul
  */
 export async function validateGeminiKey(apiKey: string): Promise<ValidationResult> {
   try {
+    // NOTE: Gemini REST API requires key as query parameter (not header).
+    // This is Google's API design; the key may appear in URL-level logs.
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1/models?key=${encodeURIComponent(apiKey)}`,
       { signal: withTimeout(TIMEOUT_MS) },

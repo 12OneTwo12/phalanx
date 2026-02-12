@@ -97,7 +97,7 @@ describe('credential-store', () => {
       const summary = getCredentialSummary('anthropic');
       expect(summary).not.toBeNull();
       expect(summary!.authMode).toBe('token');
-      expect(summary!.masked).toBe('sk-ant-oat01...3456');
+      expect(summary!.masked).toBe('sk-ant...3456');
     });
 
     it('masks short secrets with ****', () => {

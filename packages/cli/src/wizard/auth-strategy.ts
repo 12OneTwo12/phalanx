@@ -1,7 +1,7 @@
 /**
  * Auth strategies for LLM provider authentication.
  * Follows Strategy pattern (Open/Closed Principle) — add new auth methods
- * by creating a new class, no modification to existing code.
+ * by creating a new class and registering in PROVIDER_AUTH_REGISTRY.
  */
 import * as p from '@clack/prompts';
 import { existsSync, readFileSync } from 'node:fs';
@@ -14,9 +14,10 @@ import {
   validateOpenAIKey,
   validateGeminiKey,
   validateSetupTokenFormat,
+  PROVIDER_ENV_VARS,
 } from './provider-validator.js';
 import type { AuthCredential } from '../utils/credential-store.js';
-import { loadCredential, saveCredential } from '../utils/credential-store.js';
+import { loadCredential, saveCredential, maskSecret } from '../utils/credential-store.js';
 
 // ---------------------------------------------------------------------------
 // AuthStrategy interface
@@ -158,7 +159,11 @@ export class CodexOAuthStrategy implements AuthStrategy {
   readonly hint = 'Reuse credentials from Codex CLI (~/.codex/auth.json)';
   readonly authMode: ProviderAuthMode = 'oauth';
 
-  private static readonly AUTH_FILE = join(homedir(), '.codex', 'auth.json');
+  private readonly authFilePath: string;
+
+  constructor(authFilePath?: string) {
+    this.authFilePath = authFilePath ?? join(homedir(), '.codex', 'auth.json');
+  }
 
   detect(): AuthDetectResult {
     return this.readCodexAuth();
@@ -207,19 +212,19 @@ export class CodexOAuthStrategy implements AuthStrategy {
   }
 
   private readCodexAuth(): AuthDetectResult {
-    if (!existsSync(CodexOAuthStrategy.AUTH_FILE)) {
+    if (!existsSync(this.authFilePath)) {
       return { found: false };
     }
 
     try {
-      const raw = readFileSync(CodexOAuthStrategy.AUTH_FILE, 'utf-8');
+      const raw = readFileSync(this.authFilePath, 'utf-8');
       const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const accessToken = parsed.access_token as string | undefined;
+      const accessToken = parsed.access_token;
 
-      if (!accessToken) return { found: false };
+      if (typeof accessToken !== 'string' || !accessToken) return { found: false };
 
       // Check expiry if available
-      const expiresAt = parsed.expires_at as string | undefined;
+      const expiresAt = typeof parsed.expires_at === 'string' ? parsed.expires_at : undefined;
       if (expiresAt && new Date(expiresAt) < new Date()) {
         return { found: false }; // expired
       }
@@ -233,35 +238,35 @@ export class CodexOAuthStrategy implements AuthStrategy {
           ...(expiresAt && { expiresAt }),
         },
       };
-    } catch {
+    } catch (err) {
+      // JSON parse errors (corrupt file) — treat as not found
+      if (err instanceof SyntaxError) return { found: false };
+      // IO/permission errors — still not found, but could surface in future
       return { found: false };
     }
   }
 }
 
 // ---------------------------------------------------------------------------
-// Provider auth options registry
+// Provider auth options registry (Open/Closed — add entries, don't modify)
 // ---------------------------------------------------------------------------
 
+const PROVIDER_AUTH_REGISTRY: Record<string, () => AuthStrategy[]> = {
+  anthropic: () => [
+    new ApiKeyAuthStrategy('Anthropic (Claude)', 'ANTHROPIC_API_KEY', validateAnthropicKey),
+    new SetupTokenAuthStrategy(),
+  ],
+  openai: () => [
+    new ApiKeyAuthStrategy('OpenAI (GPT)', 'OPENAI_API_KEY', validateOpenAIKey),
+    new CodexOAuthStrategy(),
+  ],
+  gemini: () => [
+    new ApiKeyAuthStrategy('Google Gemini', 'GOOGLE_API_KEY', validateGeminiKey),
+  ],
+};
+
 export function getProviderAuthStrategies(providerName: string): AuthStrategy[] {
-  switch (providerName) {
-    case 'anthropic':
-      return [
-        new ApiKeyAuthStrategy('Anthropic (Claude)', 'ANTHROPIC_API_KEY', validateAnthropicKey),
-        new SetupTokenAuthStrategy(),
-      ];
-    case 'openai':
-      return [
-        new ApiKeyAuthStrategy('OpenAI (GPT)', 'OPENAI_API_KEY', validateOpenAIKey),
-        new CodexOAuthStrategy(),
-      ];
-    case 'gemini':
-      return [
-        new ApiKeyAuthStrategy('Google Gemini', 'GOOGLE_API_KEY', validateGeminiKey),
-      ];
-    default:
-      return [];
-  }
+  return PROVIDER_AUTH_REGISTRY[providerName]?.() ?? [];
 }
 
 // ---------------------------------------------------------------------------
@@ -306,41 +311,17 @@ export async function authenticateProvider(
     }
   }
 
-  // 2. Build options for user selection
-  const options = [
-    ...strategies.map((s) => ({
-      value: s.id as string,
-      label: s.label,
-      hint: s.hint,
-    })),
-    { value: 'skip' as const, label: 'Skip for now', hint: 'configure later' },
-  ];
+  // 2. Select strategy
+  const chosenId = await selectStrategy(strategies, providerLabel);
+  if (chosenId === null) return null;
+  if (chosenId === 'skip') return { valid: false, error: 'skipped' };
 
-  // Single strategy — skip selection menu, go straight to prompt
-  let chosenId: string;
-  if (strategies.length === 1) {
-    const action = await p.select({
-      message: `How do you want to configure ${providerLabel}?`,
-      options: [
-        { value: 'enter' as const, label: strategies[0].label, hint: strategies[0].hint },
-        { value: 'skip' as const, label: 'Skip for now', hint: 'configure later' },
-      ],
-    });
-    if (p.isCancel(action)) return null;
-    if (action === 'skip') return { valid: false, error: 'skipped' };
-    chosenId = strategies[0].id;
-  } else {
-    const choice = await p.select({
-      message: `How do you want to authenticate ${providerLabel}?`,
-      options,
-    });
-    if (p.isCancel(choice)) return null;
-    if (choice === 'skip') return { valid: false, error: 'skipped' };
-    chosenId = choice;
+  const strategy = strategies.find((s) => s.id === chosenId);
+  if (!strategy) {
+    return { valid: false, error: `Unknown auth strategy: ${chosenId}` };
   }
 
   // 3. Run chosen strategy
-  const strategy = strategies.find((s) => s.id === chosenId)!;
   const credential = await strategy.prompt();
   if (credential === null) return null;
 
@@ -353,10 +334,12 @@ export async function authenticateProvider(
     s.stop(`${providerLabel}: validated via ${strategy.label}`);
     saveCredential(providerName, credential);
 
-    // For API keys not from env, suggest export
-    if (strategy.id === 'api-key' && !process.env[getEnvVar(providerName)]) {
-      const envVar = getEnvVar(providerName);
-      p.log.info(`Tip: Add to your shell profile:\n  export ${envVar}="${credential.secret}"`);
+    // For API keys not from env, suggest setting env var (masked)
+    if (strategy.id === 'api-key') {
+      const envVar = PROVIDER_ENV_VARS[providerName];
+      if (envVar && !process.env[envVar]) {
+        p.log.info(`Tip: Add ${envVar} to your shell profile (starts with "${maskSecret(credential.secret)}")`);
+      }
     }
 
     return { valid: true, authMode: strategy.authMode };
@@ -366,11 +349,38 @@ export async function authenticateProvider(
   return { valid: false, authMode: strategy.authMode, error: result.error };
 }
 
-function getEnvVar(providerName: string): string {
-  const map: Record<string, string> = {
-    anthropic: 'ANTHROPIC_API_KEY',
-    openai: 'OPENAI_API_KEY',
-    gemini: 'GOOGLE_API_KEY',
-  };
-  return map[providerName] ?? '';
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function selectStrategy(
+  strategies: AuthStrategy[],
+  providerLabel: string,
+): Promise<string | 'skip' | null> {
+  if (strategies.length === 1) {
+    const action = await p.select({
+      message: `How do you want to configure ${providerLabel}?`,
+      options: [
+        { value: 'enter' as const, label: strategies[0].label, hint: strategies[0].hint },
+        { value: 'skip' as const, label: 'Skip for now', hint: 'configure later' },
+      ],
+    });
+    if (p.isCancel(action)) return null;
+    if (action === 'skip') return 'skip';
+    return strategies[0].id;
+  }
+
+  const choice = await p.select({
+    message: `How do you want to authenticate ${providerLabel}?`,
+    options: [
+      ...strategies.map((s) => ({
+        value: s.id as string,
+        label: s.label,
+        hint: s.hint,
+      })),
+      { value: 'skip' as const, label: 'Skip for now', hint: 'configure later' },
+    ],
+  });
+  if (p.isCancel(choice)) return null;
+  return choice;
 }

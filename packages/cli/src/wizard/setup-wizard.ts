@@ -6,7 +6,7 @@
 import * as p from '@clack/prompts';
 import { MODEL_CATALOG } from '@phalanx/core';
 import type { PhalanxConfig, LLMProviderEntry } from '../utils/config-loader.js';
-import { saveConfig } from '../utils/config-loader.js';
+import { saveConfig, DEFAULT_MODEL } from '../utils/config-loader.js';
 import { PROVIDER_VALIDATORS } from './provider-validator.js';
 import { getProviderAuthStrategies, authenticateProvider } from './auth-strategy.js';
 
@@ -66,7 +66,8 @@ export async function runSetupWizard(config: PhalanxConfig): Promise<WizardResul
   const providerEntries: Record<string, LLMProviderEntry> = {};
 
   for (const providerName of selectedProviders) {
-    const info = PROVIDERS.find((pr) => pr.value === providerName)!;
+    const info = PROVIDERS.find((pr) => pr.value === providerName);
+    if (!info) continue;
     const entry: LLMProviderEntry = { enabled: true };
 
     if (info.noAuth) {
@@ -117,7 +118,7 @@ export async function runSetupWizard(config: PhalanxConfig): Promise<WizardResul
     p.log.warn('No validated providers — using default model.');
     const result: WizardResult = {
       providers: providerEntries,
-      systemDefault: 'anthropic/claude-sonnet-4-5-20250929',
+      systemDefault: DEFAULT_MODEL,
       autoStart: false,
     };
     writeAndFinish(config, result);
@@ -127,7 +128,7 @@ export async function runSetupWizard(config: PhalanxConfig): Promise<WizardResul
   const defaultModel = await p.select({
     message: 'Select a default model:',
     options: modelOptions,
-    initialValue: 'anthropic/claude-sonnet-4-5-20250929',
+    initialValue: DEFAULT_MODEL,
   });
 
   if (p.isCancel(defaultModel)) {
@@ -186,12 +187,16 @@ async function verifyOllama(): Promise<{ baseUrl: string; connected: boolean } |
 }
 
 function writeAndFinish(config: PhalanxConfig, result: WizardResult): void {
-  config.llm = {
-    systemDefault: result.systemDefault,
-    providers: result.providers,
+  const updated: PhalanxConfig = {
+    ...config,
+    llm: {
+      ...config.llm,
+      systemDefault: result.systemDefault,
+      providers: result.providers,
+    },
+    daemon: { ...config.daemon, autoStart: result.autoStart },
   };
-  config.daemon = { autoStart: result.autoStart };
-  saveConfig(config);
+  saveConfig(updated);
 
   // Summary
   const lines: string[] = [];

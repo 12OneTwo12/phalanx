@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { toPhalanxLLMConfig } from '../../src/utils/llm-config-bridge.js';
 import type { PhalanxConfig } from '../../src/utils/config-loader.js';
+import { DEFAULT_MODEL } from '../../src/utils/config-loader.js';
 import {
   _setCredentialPaths,
   _resetCredentialPaths,
@@ -29,7 +30,7 @@ function makeConfig(overrides: Partial<PhalanxConfig['llm']> = {}): PhalanxConfi
     dashboardPort: 3000,
     logPath: '.phalanx/phalanx.log',
     llm: {
-      systemDefault: 'anthropic/claude-sonnet-4-5-20250929',
+      systemDefault: DEFAULT_MODEL,
       providers: {},
       ...overrides,
     },
@@ -41,7 +42,7 @@ describe('llm-config-bridge', () => {
   it('converts empty providers', () => {
     const result = toPhalanxLLMConfig(makeConfig());
     expect(result).toEqual({
-      systemDefault: 'anthropic/claude-sonnet-4-5-20250929',
+      systemDefault: DEFAULT_MODEL,
       providers: {},
     });
   });

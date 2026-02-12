@@ -48,8 +48,10 @@ export interface PhalanxConfig {
 const CONFIG_DIR = '.phalanx';
 const CONFIG_FILE = 'config.json';
 
+export const DEFAULT_MODEL = 'anthropic/claude-sonnet-4-5-20250929';
+
 const DEFAULT_LLM: PhalanxConfig['llm'] = {
-  systemDefault: 'anthropic/claude-sonnet-4-5-20250929',
+  systemDefault: DEFAULT_MODEL,
   providers: {},
 };
 
@@ -75,13 +77,14 @@ const DEFAULT_CONFIG: Omit<PhalanxConfig, 'projectRoot'> = {
  */
 export function findProjectRoot(from: string = process.cwd()): string | null {
   let dir = resolve(from);
-  const root = resolve('/');
 
-  while (dir !== root) {
+  while (true) {
     if (existsSync(join(dir, CONFIG_DIR))) {
       return dir;
     }
-    dir = resolve(dir, '..');
+    const parent = resolve(dir, '..');
+    if (parent === dir) break; // reached filesystem root
+    dir = parent;
   }
 
   return null;

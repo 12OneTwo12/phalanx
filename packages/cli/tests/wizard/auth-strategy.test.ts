@@ -133,7 +133,38 @@ describe('auth-strategy', () => {
 
   describe('CodexOAuthStrategy', () => {
     it('returns not found when ~/.codex/auth.json does not exist', () => {
-      const strategy = new CodexOAuthStrategy();
+      const strategy = new CodexOAuthStrategy(join(tempDir, 'nonexistent', 'auth.json'));
+      const result = strategy.detect();
+      expect(result.found).toBe(false);
+    });
+
+    it('detects valid credentials from auth.json', () => {
+      const authDir = join(tempDir, '.codex');
+      mkdirSync(authDir, { recursive: true });
+      writeFileSync(
+        join(authDir, 'auth.json'),
+        JSON.stringify({ access_token: 'test-access-token' }),
+      );
+
+      const strategy = new CodexOAuthStrategy(join(authDir, 'auth.json'));
+      const result = strategy.detect();
+      expect(result.found).toBe(true);
+      expect(result.credential!.secret).toBe('test-access-token');
+      expect(result.credential!.authMode).toBe('oauth');
+    });
+
+    it('returns not found for expired token', () => {
+      const authDir = join(tempDir, '.codex');
+      mkdirSync(authDir, { recursive: true });
+      writeFileSync(
+        join(authDir, 'auth.json'),
+        JSON.stringify({
+          access_token: 'expired-token',
+          expires_at: '2020-01-01T00:00:00Z',
+        }),
+      );
+
+      const strategy = new CodexOAuthStrategy(join(authDir, 'auth.json'));
       const result = strategy.detect();
       expect(result.found).toBe(false);
     });

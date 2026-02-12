@@ -2,7 +2,7 @@
  * Global credential store — persists auth secrets to ~/.phalanx/credentials.json
  * Separate from per-project .phalanx/config.json to avoid committing secrets.
  */
-import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import type { ProviderAuthMode } from '@phalanx/core';
@@ -29,13 +29,13 @@ type CredentialStore = Record<string, AuthCredential>;
 let credentialsDir = join(homedir(), '.phalanx');
 let credentialsFile = join(credentialsDir, 'credentials.json');
 
-/** Override paths for testing. */
+/** @internal Test only — override credential paths for isolated testing. */
 export function _setCredentialPaths(dir: string, file: string): void {
   credentialsDir = dir;
   credentialsFile = file;
 }
 
-/** Reset to default paths. */
+/** @internal Test only — reset to default credential paths. */
 export function _resetCredentialPaths(): void {
   credentialsDir = join(homedir(), '.phalanx');
   credentialsFile = join(credentialsDir, 'credentials.json');
@@ -48,18 +48,20 @@ export function _resetCredentialPaths(): void {
 function loadAll(): CredentialStore {
   if (!existsSync(credentialsFile)) return {};
   try {
-    return JSON.parse(readFileSync(credentialsFile, 'utf-8'));
+    const raw = JSON.parse(readFileSync(credentialsFile, 'utf-8'));
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
+    return raw as CredentialStore;
   } catch {
     return {};
   }
 }
 
 function writeAll(store: CredentialStore): void {
-  if (!existsSync(credentialsDir)) {
-    mkdirSync(credentialsDir, { recursive: true });
-  }
-  writeFileSync(credentialsFile, JSON.stringify(store, null, 2) + '\n', 'utf-8');
-  chmodSync(credentialsFile, 0o600);
+  mkdirSync(credentialsDir, { recursive: true, mode: 0o700 });
+  writeFileSync(credentialsFile, JSON.stringify(store, null, 2) + '\n', {
+    encoding: 'utf-8',
+    mode: 0o600,
+  });
 }
 
 export function saveCredential(provider: string, credential: AuthCredential): void {
@@ -70,7 +72,11 @@ export function saveCredential(provider: string, credential: AuthCredential): vo
 
 export function loadCredential(provider: string): AuthCredential | null {
   const store = loadAll();
-  return store[provider] ?? null;
+  const entry = store[provider];
+  if (!entry || typeof entry.secret !== 'string' || typeof entry.authMode !== 'string') {
+    return null;
+  }
+  return entry;
 }
 
 export function removeCredential(provider: string): void {
@@ -80,17 +86,18 @@ export function removeCredential(provider: string): void {
   writeAll(store);
 }
 
+/** Mask a secret for display: first 6 chars + "..." + last 4 chars. */
+export function maskSecret(s: string): string {
+  return s.length > 12 ? s.slice(0, 6) + '...' + s.slice(-4) : '****';
+}
+
 /**
  * Return a display-safe summary for `config show`.
- * Masks the secret: first 12 chars + "..." + last 4 chars.
  */
 export function getCredentialSummary(
   provider: string,
 ): { authMode: ProviderAuthMode; masked: string } | null {
   const cred = loadCredential(provider);
   if (!cred) return null;
-
-  const s = cred.secret;
-  const masked = s.length > 20 ? s.slice(0, 12) + '...' + s.slice(-4) : '****';
-  return { authMode: cred.authMode, masked };
+  return { authMode: cred.authMode, masked: maskSecret(cred.secret) };
 }
