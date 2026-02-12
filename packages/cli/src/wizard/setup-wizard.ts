@@ -115,13 +115,20 @@ export async function runSetupWizard(config: PhalanxConfig): Promise<WizardResul
     }));
 
   if (modelOptions.length === 0) {
-    p.log.warn('No validated providers — using default model.');
+    p.log.error('No providers were validated. Configuration saved but all providers are disabled.');
+    p.log.info('Re-run "phalanx init" to try again, or manually edit .phalanx/config.json.');
+
     const result: WizardResult = {
       providers: providerEntries,
       systemDefault: DEFAULT_MODEL,
       autoStart: false,
     };
-    writeAndFinish(config, result);
+    saveConfig({
+      ...config,
+      llm: { ...config.llm, systemDefault: result.systemDefault, providers: result.providers },
+      daemon: { ...config.daemon, autoStart: result.autoStart },
+    });
+    p.outro('Setup incomplete — no validated providers.');
     return result;
   }
 
