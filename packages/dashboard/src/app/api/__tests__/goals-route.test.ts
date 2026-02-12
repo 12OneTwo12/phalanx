@@ -22,7 +22,7 @@ vi.mock('next/server', async () => {
   };
 });
 
-import { getGoalRepository, getEpicRepository } from '@/lib/db';
+import { getGoalRepository, getEpicRepository, getTicketRepository } from '@/lib/db';
 import { GET, POST } from '../goals/route';
 
 describe('GET /api/goals', () => {
@@ -36,6 +36,9 @@ describe('GET /api/goals', () => {
     });
     (getEpicRepository as ReturnType<typeof vi.fn>).mockReturnValue({
       findByGoalId: () => [{ id: 'e1' }],
+    });
+    (getTicketRepository as ReturnType<typeof vi.fn>).mockReturnValue({
+      findByEpicId: () => [],
     });
 
     // Use the mocked NextRequest
@@ -57,6 +60,9 @@ describe('GET /api/goals', () => {
     });
     (getEpicRepository as ReturnType<typeof vi.fn>).mockReturnValue({
       findByGoalId: () => [],
+    });
+    (getTicketRepository as ReturnType<typeof vi.fn>).mockReturnValue({
+      findByEpicId: () => [],
     });
 
     const { NextRequest } = await import('next/server');
