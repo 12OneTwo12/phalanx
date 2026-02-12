@@ -243,7 +243,8 @@ export function getDaemon(): DaemonWiring {
 }
 
 /**
- * Start the daemon (idempotent). Begins orchestrator scheduling and heartbeat.
+ * Start the daemon (idempotent). Begins orchestrator scheduling, heartbeat,
+ * and channel system (Telegram, Discord, Slack, Web).
  */
 export function startDaemon(): void {
   const state = globalThis.__phalanx_daemon__ ?? (globalThis.__phalanx_daemon__ = createDaemonWiring());
@@ -251,6 +252,13 @@ export function startDaemon(): void {
     state.wiring.start();
     state.started = true;
     console.log('[phalanx] Daemon started — orchestrator scheduler and heartbeat active.');
+
+    // Start channel system (async, non-blocking)
+    void import('./channel-wiring').then(({ startChannels }) =>
+      startChannels().catch((err) =>
+        console.error('[phalanx] Channel system start failed:', err),
+      ),
+    );
   }
 }
 

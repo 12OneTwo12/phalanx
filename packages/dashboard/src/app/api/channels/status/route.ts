@@ -9,7 +9,6 @@ export async function GET() {
     name: p.name,
     running: p.isRunning(),
     capabilities: p.capabilities,
-    snapshot: p.getSnapshot(),
   }));
 
   return jsonResponse({
