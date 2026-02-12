@@ -8,6 +8,15 @@ export * from './model-catalog.js';
 export * from './thinking-level.js';
 export * from './token-tracker.js';
 export * from './failover.js';
+export {
+  BudgetEnforcer,
+  BudgetExceededError,
+  type BudgetLimits,
+  type BudgetUsage,
+  type BudgetDataProvider,
+  type BudgetCheckResult,
+  type BudgetViolation,
+} from './budget-enforcer.js';
 export * from './providers/anthropic.js';
 export * from './providers/openai.js';
 export * from './providers/ollama.js';
