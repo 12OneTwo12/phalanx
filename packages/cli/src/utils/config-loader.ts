@@ -156,6 +156,6 @@ export function saveConfig(config: PhalanxConfig): void {
   }
 
   // Exclude projectRoot from persisted config (it's derived at load time)
-  const { projectRoot: _, ...persistable } = config;
+  const { projectRoot: _projectRoot, ...persistable } = config;
   writeFileSync(configPath, JSON.stringify(persistable, null, 2) + '\n', 'utf-8');
 }

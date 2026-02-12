@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DatabaseManager } from '../../src/db/database.js';
 import { up as migrateUp0001 } from '../../src/db/migrations/0001_initial.js';
 import { up as migrateUp0002 } from '../../src/db/migrations/0002_add_missing_tables.js';
+import { up as migrateUp0005 } from '../../src/db/migrations/0005_channel_providers.js';
 import {
   ProviderConfigRepository,
   CredentialRepository,
@@ -19,6 +20,7 @@ describe('Repositories Wave 2', () => {
     db = DatabaseManager.create({ path: ':memory:' });
     migrateUp0001(db);
     migrateUp0002(db);
+    migrateUp0005(db);
   });
 
   afterEach(() => {

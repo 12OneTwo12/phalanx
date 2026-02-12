@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getConventionRepository } from '@/lib/db';
 import { jsonResponse, errorResponse, newId, parseBody } from '@/lib/api-utils';
+import { syncConventionToDisk } from '@/lib/convention-sync';
 import type { NewConvention } from '@phalanx/core';
 
 /** GET /api/conventions — list all conventions or filter by type */
@@ -41,6 +42,8 @@ export async function POST(request: Request) {
       version: existing.version + 1,
       updatedBy: (body.updatedBy as NewConvention['updatedBy']) ?? 'user',
     });
+    // Sync to disk so ConventionLoader picks up the changes
+    syncConventionToDisk(body.type, body.content);
     return jsonResponse(updated);
   }
 
@@ -50,5 +53,7 @@ export async function POST(request: Request) {
     content: body.content,
     updatedBy: (body.updatedBy as NewConvention['updatedBy']) ?? 'user',
   });
+  // Sync to disk so ConventionLoader picks up the changes
+  syncConventionToDisk(body.type, body.content);
   return jsonResponse(convention, 201);
 }

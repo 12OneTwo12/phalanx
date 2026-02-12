@@ -78,13 +78,13 @@ describe('createLLMStack', () => {
   it('uses custom system default model', () => {
     const { resolver } = createLLMStack({
       env: { ANTHROPIC_API_KEY: 'test' },
-      systemDefault: 'anthropic/claude-opus-4-6-20250414',
+      systemDefault: 'anthropic/claude-opus-4-20250514',
     });
 
     const resolved = resolver.resolve({
-      systemDefault: 'anthropic/claude-opus-4-6-20250414',
+      systemDefault: 'anthropic/claude-opus-4-20250514',
     });
-    expect(resolved.fullId).toBe('anthropic/claude-opus-4-6-20250414');
+    expect(resolved.fullId).toBe('anthropic/claude-opus-4-20250514');
   });
 
   it('Ollama registers when OLLAMA_BASE_URL is set', () => {

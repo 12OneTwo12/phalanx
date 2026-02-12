@@ -5,6 +5,7 @@ import { ticketListTool, ticketCreateTool, ticketUpdateTool } from './ticket-too
 import { agentListTool, agentUpdateTool } from './agent-tools';
 import { proposalListTool, proposalCreateTool, proposalUpdateTool } from './proposal-tools';
 import { projectStatsTool, conventionListTool } from './project-stats-tools';
+import { skillListTool, skillReadTool, skillCreateTool, skillUpdateTool, skillDeleteTool } from './skill-tools';
 
 /** All dashboard-specific tools (DB operations for Team Lead agent) */
 export const DASHBOARD_TOOLS: Tool[] = [
@@ -31,4 +32,10 @@ export const DASHBOARD_TOOLS: Tool[] = [
   // Project overview
   projectStatsTool,
   conventionListTool,
+  // Skill management
+  skillListTool,
+  skillReadTool,
+  skillCreateTool,
+  skillUpdateTool,
+  skillDeleteTool,
 ];

@@ -147,8 +147,9 @@ export class AgentTicketExecutor implements TicketExecutor {
             result,
             ticketId: ticket.id,
           });
-        } catch {
+        } catch (hookErr) {
           // Hook failure should not affect ticket result
+          console.warn(`[phalanx] Post-execution hook failed for ticket ${ticket.id}:`, hookErr);
         }
       }
 
@@ -161,6 +162,7 @@ export class AgentTicketExecutor implements TicketExecutor {
         error: result.error ?? `Agent finished with status: ${result.status}`,
       };
     } catch (err) {
+      console.error(`[phalanx] AgentTicketExecutor failed for ticket ${ticket.id}:`, err);
       return {
         success: false,
         error: err instanceof Error ? err.message : String(err),

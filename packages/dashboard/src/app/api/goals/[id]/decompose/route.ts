@@ -45,7 +45,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
     strategy = new LLMDecompositionStrategy(llm.provider, {
-      config: { model: llm.model, maxTokens: 4096, temperature: 0.3 },
+      config: { model: llm.model, maxTokens: 8192, temperature: 0.3 },
     });
   }
 

@@ -123,11 +123,20 @@ export class LLMDecompositionStrategy implements DecompositionStrategy {
 
   /** Parse LLM response, handling markdown fences */
   parseResponse(raw: string): DecomposedEpic[] {
-    // Strip markdown code fences if present
+    // Strip markdown code fences if present (greedy to handle nested content)
     let json = raw.trim();
-    const fenceMatch = json.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+    // Try multiple fence patterns
+    const fenceMatch = json.match(/```(?:json)?\s*\n([\s\S]*)\n\s*```/) 
+      ?? json.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
     if (fenceMatch) {
       json = fenceMatch[1].trim();
+    } else {
+      // Try to extract first JSON object directly
+      const jsonStart = json.indexOf('{');
+      const jsonEnd = json.lastIndexOf('}');
+      if (jsonStart !== -1 && jsonEnd > jsonStart) {
+        json = json.slice(jsonStart, jsonEnd + 1);
+      }
     }
 
     const parsed = JSON.parse(json);

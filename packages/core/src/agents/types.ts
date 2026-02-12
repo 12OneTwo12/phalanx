@@ -45,6 +45,8 @@ export interface AgentConfig {
   thinkingLevel?: ThinkingLevel;
   /** Project conventions to inject into agent system prompt */
   conventions?: string;
+  /** Formatted skill content to inject into agent system prompt */
+  skillsContent?: string;
 }
 
 // ---------------------------------------------------------------------------

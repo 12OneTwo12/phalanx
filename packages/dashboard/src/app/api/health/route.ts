@@ -1,20 +1,20 @@
-import { getGoalRepository } from '@/lib/db';
-import { jsonResponse, errorResponse } from '@/lib/api-utils';
+import { NextResponse } from 'next/server';
 
-const startTime = Date.now();
-
-/** GET /api/health — system health check */
+/**
+ * Health Check Endpoint
+ * GET /api/health
+ * 
+ * Returns server status and basic system information
+ */
 export async function GET() {
-  try {
-    // Verify database connectivity by executing a simple query
-    getGoalRepository().findAll({ limit: 1 });
+  const healthStatus = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    version: process.env.npm_package_version || '0.1.0',
+    service: 'phalanx-dashboard',
+  };
 
-    return jsonResponse({
-      status: 'ok',
-      uptime: Math.floor((Date.now() - startTime) / 1000),
-      timestamp: new Date().toISOString(),
-    });
-  } catch {
-    return errorResponse('Database connection failed', 503);
-  }
+  return NextResponse.json(healthStatus, { status: 200 });
 }

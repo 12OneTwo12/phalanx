@@ -1,0 +1,47 @@
+{
+  "dbPath": ".phalanx/phalanx.db",
+  "dashboardPort": 18080,
+  "logPath": ".phalanx/phalanx.log",
+  "llm": {
+    "systemDefault": "anthropic/claude-sonnet-4-5-20250929",
+    "providers": {
+      "anthropic": {
+        "enabled": true,
+        "authMode": "token"
+      }
+    }
+  },
+  "daemon": {
+    "autoStart": true
+  },
+  "channels": {
+    "web": { "enabled": true },
+    "telegram": {
+      "enabled": false,
+      "accounts": {
+        "default": {
+          "botToken": "env:PHALANX_TELEGRAM_BOT_TOKEN",
+          "allowFrom": []
+        }
+      }
+    },
+    "discord": {
+      "enabled": false,
+      "accounts": {
+        "default": {
+          "botToken": "env:PHALANX_DISCORD_BOT_TOKEN",
+          "guildIds": []
+        }
+      }
+    },
+    "slack": {
+      "enabled": false,
+      "accounts": {
+        "default": {
+          "botToken": "env:PHALANX_SLACK_BOT_TOKEN",
+          "appToken": "env:PHALANX_SLACK_APP_TOKEN"
+        }
+      }
+    }
+  }
+}
