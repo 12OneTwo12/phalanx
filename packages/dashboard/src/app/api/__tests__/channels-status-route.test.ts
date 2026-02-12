@@ -7,14 +7,12 @@ vi.mock('@/lib/channel-wiring', () => {
       name: 'Web Dashboard',
       isRunning: () => true,
       capabilities: { reactions: false, threads: false, edit: false, delete: false, buttons: false, media: false, markdown: true },
-      getSnapshot: () => ({ accountId: 'web', providerId: 'web', running: true, connected: true }),
     },
     {
       id: 'telegram',
       name: 'Telegram',
       isRunning: () => false,
       capabilities: { reactions: true, threads: true, edit: true, delete: true, buttons: true, media: true, markdown: true },
-      getSnapshot: () => ({ accountId: 'default', providerId: 'telegram', running: false, connected: false }),
     },
   ];
 

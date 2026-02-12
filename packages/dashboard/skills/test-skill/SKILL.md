@@ -1,6 +1,6 @@
 ---
 name: test-skill
-description: 
+description: A sample skill for testing the skill management system.
 ---
 
 # Test Skill
