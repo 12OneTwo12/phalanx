@@ -6,13 +6,9 @@ import {
   getAgentRepository,
   getTicketRepository,
 } from '@/lib/db';
+import { getLLMProvider } from '@/lib/llm-provider';
 import { eventBus } from '@/lib/event-bus';
-import {
-  AnthropicProvider,
-  TeamLeadChatService,
-  type ChatMessage,
-  type ProjectContext,
-} from '@phalanx/core';
+import { TeamLeadChatService, type ChatMessage, type ProjectContext } from '@phalanx/core';
 import type { ChannelMessage } from '@phalanx/core';
 
 export type { ChannelMessage };
@@ -70,14 +66,13 @@ export async function POST(request: Request) {
 async function generateTeamLeadResponse(
   repo: ReturnType<typeof getChannelMessageRepository>,
 ) {
-  const provider = new AnthropicProvider();
-  const isAvailable = await provider.isAvailable();
-  if (!isAvailable) {
-    // No API key configured — save a system message and return
+  // Get configured LLM provider from credential store + project config
+  const llm = getLLMProvider();
+  if (!llm) {
     const notice = repo.create({
       id: newId(),
       role: 'team-lead',
-      content: 'LLM provider is not configured. Set the ANTHROPIC_API_KEY environment variable to enable Team Lead responses.',
+      content: 'LLM provider is not configured. Run `phalanx init` to set up a provider, or set an API key environment variable (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.).',
     });
     eventBus.emit('channel:message', { messageId: notice.id, role: notice.role });
     return notice;
@@ -94,8 +89,8 @@ async function generateTeamLeadResponse(
     // Load project context
     const context = buildProjectContext();
 
-    // Generate response
-    const service = new TeamLeadChatService(provider);
+    // Generate response using the configured provider and model
+    const service = new TeamLeadChatService(llm.provider, { model: llm.model });
     const responseText = await service.respond(chatHistory, context);
 
     // Save Team Lead response
@@ -117,7 +112,6 @@ async function generateTeamLeadResponse(
 
     return teamLeadMessage;
   } catch (error) {
-    // On LLM failure, save an error message so the user knows
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     const notice = repo.create({
       id: newId(),

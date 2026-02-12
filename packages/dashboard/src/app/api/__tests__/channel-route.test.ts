@@ -41,19 +41,18 @@ const mockChat = vi.fn().mockResolvedValue({
   model: 'mock-model',
 });
 
-vi.mock('@phalanx/core', async (importOriginal) => {
-  const original = await importOriginal<Record<string, unknown>>();
-  return {
-    ...original,
-    AnthropicProvider: vi.fn().mockImplementation(() => ({
-      name: 'anthropic',
+vi.mock('@/lib/llm-provider', () => ({
+  getLLMProvider: vi.fn(() => ({
+    provider: {
+      name: 'mock',
       models: ['mock-model'],
       chat: mockChat,
       chatWithTools: vi.fn(),
       isAvailable: vi.fn().mockResolvedValue(true),
-    })),
-  };
-});
+    },
+    model: 'mock-model',
+  })),
+}));
 
 import { GET, POST } from '../channel/route';
 
@@ -123,7 +122,6 @@ describe('POST /api/channel', () => {
   });
 
   it('should call LLM with channel history', async () => {
-    // Pre-populate a message
     mockMessages.push({
       id: 'prev-1',
       role: 'user',
@@ -140,5 +138,22 @@ describe('POST /api/channel', () => {
 
     await POST(req);
     expect(mockChat).toHaveBeenCalledOnce();
+  });
+
+  it('should show config message when no provider is available', async () => {
+    const { getLLMProvider } = await import('@/lib/llm-provider');
+    (getLLMProvider as ReturnType<typeof vi.fn>).mockReturnValueOnce(null);
+
+    const req = new Request('http://localhost/api/channel', {
+      method: 'POST',
+      body: JSON.stringify({ content: 'Hello' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.teamLeadMessage.content).toContain('phalanx init');
   });
 });
