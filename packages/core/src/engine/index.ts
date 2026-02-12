@@ -50,3 +50,5 @@ export {
   type SafeExecuteContext,
   type RecoveryState,
 } from './safe-execute.js';
+export { AutoCommenter } from './auto-commenter.js';
+export { WorkLogRecorder } from './work-log-recorder.js';
