@@ -45,6 +45,7 @@ export { CompletionHandler } from './completion-handler.js';
 export { DaemonWiring, type DaemonDeps } from './daemon-wiring.js';
 export {
   safeExecute,
+  cancelAllRunning,
   RecoveryManager,
   type Result,
   type SafeExecuteContext,
@@ -52,3 +53,6 @@ export {
 } from './safe-execute.js';
 export { AutoCommenter } from './auto-commenter.js';
 export { WorkLogRecorder } from './work-log-recorder.js';
+export { DebateOrchestrator, type DebateOrchestratorDeps, type DebateEvents } from './debate-orchestrator.js';
+export { MeetingOrchestrator, type MeetingOrchestratorDeps, type MeetingConfig, type MeetingEvents } from './meeting-orchestrator.js';
+export { DailySummaryGenerator, type DailySummary, type AgentDailySummary } from './daily-summary-generator.js';
