@@ -2,7 +2,7 @@
 
 import { use, useState, useCallback } from 'react';
 import useSWR from 'swr';
-import { fetcher, apiPatch } from '@/lib/api-client';
+import { fetcher, apiPatch, apiPost } from '@/lib/api-client';
 import type { Goal, Epic, Ticket } from '@phalanx/core';
 import Link from 'next/link';
 
@@ -35,6 +35,16 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
         ? { status, approvedAt: new Date().toISOString() }
         : { status };
       await apiPatch(`/tickets/${ticketId}`, body);
+      await mutate();
+    } finally {
+      setActionLoading(null);
+    }
+  }, [mutate]);
+
+  const handleRetry = useCallback(async (ticketId: string) => {
+    setActionLoading(ticketId);
+    try {
+      await apiPost(`/tickets/${ticketId}/retry`, {});
       await mutate();
     } finally {
       setActionLoading(null);
@@ -171,6 +181,15 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
                                 Reject
                               </button>
                             </>
+                          )}
+                          {ticket.status === 'failed' && (
+                            <button
+                              onClick={() => handleRetry(ticket.id)}
+                              disabled={actionLoading === ticket.id}
+                              className="rounded bg-blue-600/20 px-2 py-1 text-xs text-blue-400 hover:bg-blue-600/30 disabled:opacity-50"
+                            >
+                              Retry
+                            </button>
                           )}
                         </div>
                       </div>
