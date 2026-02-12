@@ -15,10 +15,11 @@ const PRIORITY_DOTS: Record<string, string> = {
 
 interface KanbanCardProps {
   ticket: Ticket;
+  agentNames?: Map<string, string>;
 }
 
 /** Kanban card component with approve/reject actions for pending tickets */
-export function KanbanCard({ ticket }: KanbanCardProps) {
+export function KanbanCard({ ticket, agentNames }: KanbanCardProps) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -57,7 +58,9 @@ export function KanbanCard({ ticket }: KanbanCardProps) {
             {ticket.title}
           </Link>
           {ticket.assignedAgentId && (
-            <p className="mt-1 text-xs text-gray-500">Agent: {ticket.assignedAgentId}</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Agent: {agentNames?.get(ticket.assignedAgentId) ?? ticket.assignedAgentId}
+            </p>
           )}
         </div>
       </div>

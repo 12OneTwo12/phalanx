@@ -6,9 +6,10 @@ import { KanbanCard } from './kanban-card';
 
 interface KanbanBoardProps {
   tickets: Ticket[];
+  agentNames?: Map<string, string>;
 }
 
-export function KanbanBoard({ tickets }: KanbanBoardProps) {
+export function KanbanBoard({ tickets, agentNames }: KanbanBoardProps) {
   const grouped = groupTicketsByStatus(tickets);
 
   return (
@@ -30,7 +31,7 @@ export function KanbanBoard({ tickets }: KanbanBoardProps) {
             </div>
             <div className="space-y-2">
               {items.map((ticket) => (
-                <KanbanCard key={ticket.id} ticket={ticket} />
+                <KanbanCard key={ticket.id} ticket={ticket} agentNames={agentNames} />
               ))}
               {items.length === 0 && (
                 <p className="py-4 text-center text-xs text-gray-600">No tickets</p>
