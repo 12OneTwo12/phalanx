@@ -6,3 +6,4 @@ export { BUILTIN_TOOLS } from './tools/builtin/index.js';
 export * from './db/index.js';
 export * from './conventions/index.js';
 export * from './engine/index.js';
+export * from './heartbeat/index.js';
