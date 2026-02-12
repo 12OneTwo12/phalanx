@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import type { Tool, ToolExecutionContext, ToolResult } from '../types.js';
-import { resolveSafePath } from './path-utils.js';
+import { resolveSafePath, isSensitivePath } from './path-utils.js';
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -28,6 +28,10 @@ export const fileWriteTool: Tool<typeof schema> = {
     context: ToolExecutionContext,
   ): Promise<ToolResult> {
     try {
+      if (isSensitivePath(params.path)) {
+        return { success: false, content: '', error: 'Access denied: sensitive file path' };
+      }
+
       const resolved = await resolveSafePath(params.path, context.workingDirectory);
       if (!resolved) {
         return { success: false, content: '', error: 'Path traversal denied' };

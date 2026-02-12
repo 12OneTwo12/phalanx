@@ -12,6 +12,62 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_OUTPUT_CHARS = 50_000;
 
+// ---------------------------------------------------------------------------
+// Command Allowlist
+// ---------------------------------------------------------------------------
+
+/** Commands allowed when allowlist mode is enabled */
+const DEFAULT_ALLOWED_COMMANDS: string[] = [
+  'npm', 'pnpm', 'yarn', 'node', 'npx',
+  'tsc', 'eslint', 'prettier',
+  'vitest', 'jest', 'mocha',
+  'git', 'gh',
+  'cat', 'ls', 'find', 'grep', 'head', 'tail', 'wc',
+  'echo', 'pwd', 'which', 'env', 'printenv',
+  'mkdir', 'touch', 'cp', 'mv', 'rm',
+  'docker', 'docker-compose',
+];
+
+export interface TerminalSecurityConfig {
+  /** When true, only allowed commands can be executed */
+  allowlistMode: boolean;
+  /** Additional commands to allow (extends default list) */
+  customAllowlist?: string[];
+}
+
+/**
+ * Check if a command contains shell command substitution ($() or backticks).
+ * These are too complex to parse safely — reject when allowlist is active.
+ */
+function hasCommandSubstitution(command: string): boolean {
+  return /\$\(/.test(command) || /`/.test(command);
+}
+
+/**
+ * Extract the base command from each segment of a piped/chained command.
+ * Returns all base commands found.
+ */
+function extractBaseCommands(command: string): string[] {
+  // Split on pipes, &&, ||, ; — extract the first word from each part
+  return command
+    .split(/[|&;]+/)
+    .map(part => part.trim())
+    .filter(Boolean)
+    .map(part => part.split(/\s+/)[0]);
+}
+
+/**
+ * Check if all commands in a pipeline are in the allowlist.
+ */
+export function isCommandAllowed(command: string, config: TerminalSecurityConfig): boolean {
+  if (!config.allowlistMode) return true;
+  // Block command substitution — too complex to parse safely
+  if (hasCommandSubstitution(command)) return false;
+  const allowed = [...DEFAULT_ALLOWED_COMMANDS, ...(config.customAllowlist ?? [])];
+  const bases = extractBaseCommands(command);
+  return bases.every(base => allowed.includes(base));
+}
+
 /** Dangerous command patterns that are always blocked */
 const BLOCKED_COMMAND_PATTERNS: RegExp[] = [
   /\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+).*\//,  // rm -rf / variants
@@ -20,8 +76,8 @@ const BLOCKED_COMMAND_PATTERNS: RegExp[] = [
   /\bdd\s+.*of=\/dev\//,                                  // dd to device
   />\s*\/dev\/sd[a-z]/,                                    // redirect to disk
   /\b:()\s*\{\s*:\|\s*:&\s*\}\s*;?\s*:/,                  // fork bomb
-  /\bcurl\b.*\|\s*(ba)?sh/,                               // curl pipe to shell
-  /\bwget\b.*\|\s*(ba)?sh/,                               // wget pipe to shell
+  /\bcurl\b.*\|.*(ba)?sh\b/,                               // curl pipe to shell
+  /\bwget\b.*\|.*(ba)?sh\b/,                               // wget pipe to shell
   /\bchmod\s+(-[a-zA-Z]*\s+)?777\s+\//,                  // chmod 777 /
   /\bchown\s+.*\s+\/\s*$/,                                // chown / root
 ];
