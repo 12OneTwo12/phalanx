@@ -7,25 +7,19 @@
 import type { DatabaseManager } from '../database.js';
 
 export function up(db: DatabaseManager): void {
-  // Add provider tracking columns
-  db.exec(`
-    ALTER TABLE channel_messages ADD COLUMN channel_provider TEXT NOT NULL DEFAULT 'web';
-  `);
-  db.exec(`
-    ALTER TABLE channel_messages ADD COLUMN channel_id TEXT NOT NULL DEFAULT 'dashboard';
-  `);
-  db.exec(`
-    ALTER TABLE channel_messages ADD COLUMN sender_id TEXT;
-  `);
-  db.exec(`
-    ALTER TABLE channel_messages ADD COLUMN sender_name TEXT;
-  `);
-  db.exec(`
-    ALTER TABLE channel_messages ADD COLUMN reply_to_id TEXT;
-  `);
-  db.exec(`
-    ALTER TABLE channel_messages ADD COLUMN thread_id TEXT;
-  `);
+  // Add provider tracking columns (idempotent via try-catch)
+  const addColumn = (sql: string) => {
+    try { db.exec(sql); } catch {
+      // Column already exists — safe to ignore
+    }
+  };
+
+  addColumn(`ALTER TABLE channel_messages ADD COLUMN channel_provider TEXT NOT NULL DEFAULT 'web';`);
+  addColumn(`ALTER TABLE channel_messages ADD COLUMN channel_id TEXT NOT NULL DEFAULT 'dashboard';`);
+  addColumn(`ALTER TABLE channel_messages ADD COLUMN sender_id TEXT;`);
+  addColumn(`ALTER TABLE channel_messages ADD COLUMN sender_name TEXT;`);
+  addColumn(`ALTER TABLE channel_messages ADD COLUMN reply_to_id TEXT;`);
+  addColumn(`ALTER TABLE channel_messages ADD COLUMN thread_id TEXT;`);
 
   // Index for efficient queries by provider and channel
   db.exec(`

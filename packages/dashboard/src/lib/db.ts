@@ -9,6 +9,7 @@ import {
   migrateUp0002,
   migrateUp0003,
   migrateUp0004,
+  migrateUp0005,
   GoalRepository,
   EpicRepository,
   TicketRepository,
@@ -45,6 +46,7 @@ export function getDb(): DatabaseManager {
     migrateUp0002(db);
     migrateUp0003(db);
     migrateUp0004(db);
+    migrateUp0005(db);
     migrated = true;
   }
   return db;

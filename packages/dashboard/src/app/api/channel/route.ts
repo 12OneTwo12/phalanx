@@ -12,48 +12,58 @@ export type { ChannelMessage };
 
 /** GET /api/channel — get all channel messages */
 export async function GET(request: Request) {
-  const repo = getChannelMessageRepository();
-  const { searchParams } = new URL(request.url);
-  const limit = Number(searchParams.get('limit') ?? 100);
-  const offset = Number(searchParams.get('offset') ?? 0);
-  const messages = repo.findAll({ limit, offset });
-  return jsonResponse(messages);
+  try {
+    const repo = getChannelMessageRepository();
+    const { searchParams } = new URL(request.url);
+    const limit = Number(searchParams.get('limit') ?? 100);
+    const offset = Number(searchParams.get('offset') ?? 0);
+    const messages = repo.findAll({ limit, offset });
+    return jsonResponse(messages);
+  } catch (err) {
+    console.error('[channel GET]', err);
+    return errorResponse(err instanceof Error ? err.message : 'Internal server error', 500);
+  }
 }
 
 /** POST /api/channel — send a message and get Team Lead agent response */
 export async function POST(request: Request) {
-  const body = await parseBody<{ content: string; role?: 'user' | 'team-lead' }>(request);
-  if (!body?.content?.trim()) {
-    return errorResponse('content is required');
-  }
-
-  const repo = getChannelMessageRepository();
-
-  // Save user message
-  const userMessage = repo.create({
-    id: newId(),
-    role: body.role ?? 'user',
-    content: body.content.trim(),
-  });
-
-  // Log user message as activity
-  logActivity(`channel:message from ${userMessage.role}`, {
-    messageId: userMessage.id,
-    preview: userMessage.content.slice(0, 100),
-  });
-
-  // Broadcast user message via SSE
-  eventBus.emit('channel:message', { messageId: userMessage.id, role: userMessage.role });
-
-  // If the message is from user, generate Team Lead agent response
-  if (userMessage.role === 'user') {
-    const teamLeadReply = await generateTeamLeadResponse(repo);
-    if (teamLeadReply) {
-      return jsonResponse({ userMessage, teamLeadMessage: teamLeadReply }, 201);
+  try {
+    const body = await parseBody<{ content: string; role?: 'user' | 'team-lead' }>(request);
+    if (!body?.content?.trim()) {
+      return errorResponse('content is required');
     }
-  }
 
-  return jsonResponse({ userMessage }, 201);
+    const repo = getChannelMessageRepository();
+
+    // Save user message
+    const userMessage = repo.create({
+      id: newId(),
+      role: body.role ?? 'user',
+      content: body.content.trim(),
+    });
+
+    // Log user message as activity
+    logActivity(`channel:message from ${userMessage.role}`, {
+      messageId: userMessage.id,
+      preview: userMessage.content.slice(0, 100),
+    });
+
+    // Broadcast user message via SSE
+    eventBus.emit('channel:message', { messageId: userMessage.id, role: userMessage.role });
+
+    // If the message is from user, generate Team Lead agent response
+    if (userMessage.role === 'user') {
+      const teamLeadReply = await generateTeamLeadResponse(repo);
+      if (teamLeadReply) {
+        return jsonResponse({ userMessage, teamLeadMessage: teamLeadReply }, 201);
+      }
+    }
+
+    return jsonResponse({ userMessage }, 201);
+  } catch (err) {
+    console.error('[channel POST]', err);
+    return errorResponse(err instanceof Error ? err.message : 'Internal server error', 500);
+  }
 }
 
 // ---------------------------------------------------------------------------
