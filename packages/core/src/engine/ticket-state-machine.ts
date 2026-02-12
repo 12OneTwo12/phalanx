@@ -23,6 +23,7 @@ const TRANSITIONS: readonly Transition[] = [
   { from: 'verification', action: 'fail', to: 'in_progress' },
   { from: 'in_progress', action: 'error', to: 'failed' },
   { from: 'failed', action: 'retry', to: 'in_progress' },
+  { from: 'failed', action: 'reset', to: 'backlog' },
   { from: 'failed', action: 'escalate', to: 'escalated' },
 ] as const;
 

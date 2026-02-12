@@ -170,7 +170,7 @@ describe('Engine Edge Cases', () => {
   // ---------------------------------------------------------------------------
   it('TicketStateMachine: getTransitions returns full table', () => {
     const transitions = TicketStateMachine.getTransitions();
-    expect(transitions.length).toBe(9);
+    expect(transitions.length).toBe(10);
   });
 
   // ---------------------------------------------------------------------------

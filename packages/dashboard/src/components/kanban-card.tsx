@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { Ticket } from '@phalanx/core';
-import { apiPatch } from '@/lib/api-client';
+import { apiPatch, apiPost } from '@/lib/api-client';
 import { mutate } from 'swr';
 
 const PRIORITY_DOTS: Record<string, string> = {
@@ -49,6 +49,19 @@ export function KanbanCard({ ticket, agentNames }: KanbanCardProps) {
     }
   };
 
+  const handleRetry = async () => {
+    setActionError(null);
+    setLoading(true);
+    try {
+      await apiPost(`/tickets/${ticket.id}/retry`, {});
+      await mutate('/api/tickets');
+    } catch {
+      setActionError('Failed to retry ticket');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="rounded-md border border-gray-700 bg-gray-800 p-3">
       <div className="flex items-start gap-2">
@@ -86,6 +99,23 @@ export function KanbanCard({ ticket, agentNames }: KanbanCardProps) {
               ✗ Reject
             </button>
           </div>
+          {actionError && (
+            <p className="text-xs text-red-400">{actionError}</p>
+          )}
+        </div>
+      )}
+
+      {/* Retry action for failed tickets */}
+      {ticket.status === 'failed' && (
+        <div className="mt-2 flex flex-col gap-1">
+          <button
+            onClick={handleRetry}
+            disabled={loading}
+            aria-label={`Retry ticket: ${ticket.title}`}
+            className="rounded bg-blue-600/20 px-2 py-1 text-xs text-blue-400 hover:bg-blue-600/30 disabled:opacity-50"
+          >
+            ↻ Retry
+          </button>
           {actionError && (
             <p className="text-xs text-red-400">{actionError}</p>
           )}

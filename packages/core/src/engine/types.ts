@@ -25,6 +25,7 @@ export const TicketAction = z.enum([
   'fail',
   'error',
   'retry',
+  'reset',
   'escalate',
 ]);
 export type TicketAction = z.infer<typeof TicketAction>;
