@@ -14,6 +14,7 @@ import type { EscalationRepository } from '../db/repositories/escalation.reposit
 import type { VerificationService } from './verification-service.js';
 import type { AssignmentService } from './assignment-service.js';
 import type { GoalManager } from './goal-manager.js';
+import type { PRCreator } from './pr/pr-creator.js';
 
 export class CompletionHandler extends EventEmitter {
   constructor(
@@ -23,6 +24,7 @@ export class CompletionHandler extends EventEmitter {
     private readonly verificationService: VerificationService,
     private readonly assignmentService: AssignmentService,
     private readonly goalManager: GoalManager,
+    private readonly prCreator?: PRCreator,
   ) {
     super();
   }
@@ -40,7 +42,7 @@ export class CompletionHandler extends EventEmitter {
    * Handle a ticket that passed verification (status already transitioned to 'done').
    * Updates goal progress and releases the assigned agent.
    */
-  handlePass(ticketId: string): void {
+  async handlePass(ticketId: string): Promise<void> {
     const ticket = this.ticketRepo.findById(ticketId);
     if (!ticket) {
       this.emit('warning', { message: `handlePass: ticket ${ticketId} not found` });
@@ -54,6 +56,23 @@ export class CompletionHandler extends EventEmitter {
         const progress = this.goalManager.calculateProgress(epic.goalId);
         this.emit('goal:progressUpdated', { goalId: epic.goalId, progress });
       }
+      // Create PR if branch exists and prCreator is available
+      if (this.prCreator && ticket.branch) {
+        try {
+          const prResult = await this.prCreator.create({
+            ticket: { id: ticket.id, title: ticket.title, description: ticket.description },
+            branch: ticket.branch,
+            baseBranch: 'main',
+            verificationResult: { ticketId, status: 'passed', checks: [] },
+            decision: 'auto_merge',
+          });
+          this.ticketRepo.update(ticketId, { prUrl: `PR: ${prResult.title}` });
+          this.emit('ticket:pr-created', { ticketId, branch: ticket.branch });
+        } catch {
+          // PR creation failure is non-fatal
+        }
+      }
+
       this.emit('ticket:completed', { ticketId });
     } finally {
       // Agent release must happen regardless of goal progress errors
