@@ -124,6 +124,25 @@ export function toAnthropicTools(
 }
 
 // ---------------------------------------------------------------------------
+// OAuth token detection
+// ---------------------------------------------------------------------------
+
+const OAUTH_TOKEN_PREFIX = 'sk-ant-oat';
+
+function isOAuthToken(key: string): boolean {
+  return key.startsWith(OAUTH_TOKEN_PREFIX);
+}
+
+/** Required headers for OAuth token authentication (Claude Code Max/Pro plan) */
+const OAUTH_DEFAULT_HEADERS: Record<string, string> = {
+  'anthropic-beta': 'claude-code-20250219,oauth-2025-04-20',
+};
+
+/** Claude Code identity prefix required for OAuth tokens */
+const CLAUDE_CODE_SYSTEM_PREFIX =
+  'You are Claude Code, Anthropic\'s official CLI for Claude.\n\n';
+
+// ---------------------------------------------------------------------------
 // AnthropicProvider
 // ---------------------------------------------------------------------------
 
@@ -136,18 +155,37 @@ export class AnthropicProvider implements LLMProvider {
 
   private client: Anthropic;
   private apiKey: string;
+  private readonly useOAuth: boolean;
 
   constructor(
     config: ProviderConfig = {},
     env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
   ) {
     this.apiKey = config.apiKey ?? env.ANTHROPIC_API_KEY ?? '';
-    this.client = new Anthropic({
-      apiKey: this.apiKey || undefined,
-      baseURL: config.baseUrl,
-      maxRetries: config.maxRetries ?? 2,
-      timeout: config.timeout ?? 120_000,
-    });
+    this.useOAuth = isOAuthToken(this.apiKey);
+
+    if (this.useOAuth) {
+      // OAuth tokens use Authorization: Bearer header, not x-api-key
+      this.client = new Anthropic({
+        apiKey: null as unknown as string,
+        authToken: this.apiKey,
+        baseURL: config.baseUrl,
+        maxRetries: config.maxRetries ?? 2,
+        timeout: config.timeout ?? 120_000,
+        defaultHeaders: {
+          ...OAUTH_DEFAULT_HEADERS,
+          ...config.headers,
+        },
+      });
+    } else {
+      this.client = new Anthropic({
+        apiKey: this.apiKey || undefined,
+        baseURL: config.baseUrl,
+        maxRetries: config.maxRetries ?? 2,
+        timeout: config.timeout ?? 120_000,
+        ...(config.headers && { defaultHeaders: config.headers }),
+      });
+    }
   }
 
   async chat(params: ChatParams): Promise<ChatResult> {
@@ -155,11 +193,13 @@ export class AnthropicProvider implements LLMProvider {
       effectiveThinkingLevel(params.thinkingLevel, params.model),
     );
 
+    const systemPrompt = this.buildSystemPrompt(params.systemPrompt);
+
     const requestParams: Anthropic.MessageCreateParams = {
       model: params.model,
       messages: toAnthropicMessages(params.messages),
       max_tokens: params.maxTokens ?? 4096,
-      ...(params.systemPrompt && { system: params.systemPrompt }),
+      ...(systemPrompt && { system: systemPrompt }),
       ...(params.temperature !== undefined && { temperature: params.temperature }),
       ...(params.stopSequences && { stop_sequences: params.stopSequences }),
     };
@@ -183,12 +223,14 @@ export class AnthropicProvider implements LLMProvider {
       effectiveThinkingLevel(params.thinkingLevel, params.model),
     );
 
+    const systemPrompt = this.buildSystemPrompt(params.systemPrompt);
+
     const requestParams: Anthropic.MessageCreateParams = {
       model: params.model,
       messages: toAnthropicMessages(params.messages),
       max_tokens: params.maxTokens ?? 4096,
       tools: toAnthropicTools(params.tools),
-      ...(params.systemPrompt && { system: params.systemPrompt }),
+      ...(systemPrompt && { system: systemPrompt }),
       ...(params.temperature !== undefined && { temperature: params.temperature }),
       ...(params.stopSequences && { stop_sequences: params.stopSequences }),
     };
@@ -216,6 +258,12 @@ export class AnthropicProvider implements LLMProvider {
       model: response.model,
       thinkingContent: thinking || undefined,
     };
+  }
+
+  /** Prepend Claude Code identity for OAuth tokens (required by Anthropic API) */
+  private buildSystemPrompt(prompt?: string): string | undefined {
+    if (!this.useOAuth) return prompt;
+    return CLAUDE_CODE_SYSTEM_PREFIX + (prompt ?? '');
   }
 
   async isAvailable(): Promise<boolean> {

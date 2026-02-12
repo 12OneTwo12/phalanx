@@ -1,6 +1,21 @@
-import { describe, it, expect } from 'vitest';
-import { toAnthropicMessages, toAnthropicTools } from '../../../src/llm/providers/anthropic.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Message, ToolDefinition } from '../../../src/llm/types.js';
+
+// Hoist the mock constructor so it's available before module imports
+const mockCreate = vi.fn();
+const MockAnthropicConstructor = vi.fn().mockImplementation((opts: Record<string, unknown>) => ({
+  _options: opts,
+  messages: { create: mockCreate },
+}));
+
+vi.mock('@anthropic-ai/sdk', () => ({
+  default: MockAnthropicConstructor,
+}));
+
+// Import AFTER the mock is set up
+const { toAnthropicMessages, toAnthropicTools, AnthropicProvider } = await import(
+  '../../../src/llm/providers/anthropic.js'
+);
 
 describe('toAnthropicMessages', () => {
   it('converts simple text messages', () => {
@@ -107,5 +122,90 @@ describe('toAnthropicTools', () => {
     expect(result).toHaveLength(2);
     expect(result[0].name).toBe('search');
     expect(result[1].name).toBe('read');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OAuth token support
+// ---------------------------------------------------------------------------
+
+describe('AnthropicProvider — OAuth token support', () => {
+  beforeEach(() => {
+    MockAnthropicConstructor.mockClear();
+    mockCreate.mockReset();
+  });
+
+  it('detects OAuth token by sk-ant-oat prefix and uses authToken', () => {
+    const oauthKey = 'sk-ant-oat01-abc123';
+    new AnthropicProvider({ apiKey: oauthKey }, {});
+
+    expect(MockAnthropicConstructor).toHaveBeenCalledTimes(1);
+    const opts = MockAnthropicConstructor.mock.calls[0][0] as Record<string, unknown>;
+    expect(opts.authToken).toBe(oauthKey);
+    expect(opts.apiKey).toBeNull();
+    expect(opts.defaultHeaders).toEqual(
+      expect.objectContaining({
+        'anthropic-beta': expect.stringContaining('oauth-2025-04-20'),
+      }),
+    );
+  });
+
+  it('uses regular apiKey for non-OAuth tokens', () => {
+    const regularKey = 'sk-ant-api03-xyz789';
+    new AnthropicProvider({ apiKey: regularKey }, {});
+
+    expect(MockAnthropicConstructor).toHaveBeenCalledTimes(1);
+    const opts = MockAnthropicConstructor.mock.calls[0][0] as Record<string, unknown>;
+    expect(opts.apiKey).toBe(regularKey);
+    expect(opts.authToken).toBeUndefined();
+  });
+
+  it('prepends Claude Code identity to system prompt for OAuth tokens', async () => {
+    const oauthKey = 'sk-ant-oat01-abc123';
+    const provider = new AnthropicProvider({ apiKey: oauthKey }, {});
+
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'Hello' }],
+      usage: { input_tokens: 10, output_tokens: 5 },
+      model: 'claude-sonnet-4-5-20250929',
+      stop_reason: 'end_turn',
+    });
+
+    await provider.chat({
+      model: 'claude-sonnet-4-5-20250929',
+      messages: [{ role: 'user', content: 'Hi' }],
+      systemPrompt: 'Be helpful.',
+    });
+
+    const callArgs = mockCreate.mock.calls[0][0];
+    expect(callArgs.system).toMatch(
+      /^You are Claude Code, Anthropic's official CLI for Claude\.\n\nBe helpful\.$/,
+    );
+  });
+
+  it('does NOT prepend Claude Code identity for regular API keys', async () => {
+    const regularKey = 'sk-ant-api03-xyz789';
+    const provider = new AnthropicProvider({ apiKey: regularKey }, {});
+
+    mockCreate.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'Hello' }],
+      usage: { input_tokens: 10, output_tokens: 5 },
+      model: 'claude-sonnet-4-5-20250929',
+      stop_reason: 'end_turn',
+    });
+
+    await provider.chat({
+      model: 'claude-sonnet-4-5-20250929',
+      messages: [{ role: 'user', content: 'Hi' }],
+      systemPrompt: 'Be helpful.',
+    });
+
+    const callArgs = mockCreate.mock.calls[0][0];
+    expect(callArgs.system).toBe('Be helpful.');
+  });
+
+  it('isAvailable returns true for OAuth tokens', async () => {
+    const provider = new AnthropicProvider({ apiKey: 'sk-ant-oat01-abc' }, {});
+    expect(await provider.isAvailable()).toBe(true);
   });
 });
