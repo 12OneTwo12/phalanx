@@ -8,6 +8,7 @@ import {
   migrateUp,
   migrateUp0002,
   migrateUp0003,
+  migrateUp0004,
   GoalRepository,
   EpicRepository,
   TicketRepository,
@@ -26,6 +27,10 @@ import {
   KnowledgeEntryRepository,
   ChannelMessageRepository,
   TicketCommentRepository,
+  DebateRepository,
+  DebateArgumentRepository,
+  MeetingRepository,
+  MeetingParticipantRepository,
 } from '@phalanx/core';
 
 const DB_PATH = process.env.PHALANX_DB_PATH ?? 'phalanx.db';
@@ -39,6 +44,7 @@ export function getDb(): DatabaseManager {
     migrateUp(db);
     migrateUp0002(db);
     migrateUp0003(db);
+    migrateUp0004(db);
     migrated = true;
   }
   return db;
@@ -115,4 +121,20 @@ export function getChannelMessageRepository() {
 
 export function getTicketCommentRepository() {
   return new TicketCommentRepository(getDb().orm);
+}
+
+export function getDebateRepository() {
+  return new DebateRepository(getDb().orm);
+}
+
+export function getDebateArgumentRepository() {
+  return new DebateArgumentRepository(getDb().orm);
+}
+
+export function getMeetingRepository() {
+  return new MeetingRepository(getDb().orm);
+}
+
+export function getMeetingParticipantRepository() {
+  return new MeetingParticipantRepository(getDb().orm);
 }
