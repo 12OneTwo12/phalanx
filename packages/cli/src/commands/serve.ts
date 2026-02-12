@@ -62,10 +62,10 @@ export const serveCommand = new Command('serve')
  */
 function resolveDashboardDir(projectRoot: string): string | null {
   const candidates = [
-    // Monorepo sibling: packages/cli -> packages/dashboard
-    resolve(import.meta.dirname, '..', '..', '..', 'dashboard'),
+    // Monorepo sibling: packages/cli/dist -> packages/dashboard
+    resolve(import.meta.dirname, '..', '..', 'dashboard'),
     // node_modules relative to CLI package
-    resolve(import.meta.dirname, '..', '..', 'node_modules', '@phalanx', 'dashboard'),
+    resolve(import.meta.dirname, '..', 'node_modules', '@phalanx', 'dashboard'),
     // node_modules relative to project root
     resolve(projectRoot, 'node_modules', '@phalanx', 'dashboard'),
   ];
@@ -79,12 +79,12 @@ function resolveDashboardDir(projectRoot: string): string | null {
 }
 
 /**
- * Resolve the Next.js CLI binary path.
+ * Resolve the Next.js JS entry point (not the shell wrapper in .bin/).
+ * fork() requires a JS module, not a shell script.
  */
 function resolveNextBin(dashboardDir: string): string | null {
   const candidates = [
-    resolve(dashboardDir, 'node_modules', '.bin', 'next'),
-    resolve(dashboardDir, '..', '..', 'node_modules', '.bin', 'next'),
+    resolve(dashboardDir, 'node_modules', 'next', 'dist', 'bin', 'next'),
     resolve(dashboardDir, '..', '..', 'node_modules', 'next', 'dist', 'bin', 'next'),
   ];
 

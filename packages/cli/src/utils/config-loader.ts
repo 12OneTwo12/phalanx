@@ -61,7 +61,7 @@ const DEFAULT_DAEMON: PhalanxConfig['daemon'] = {
 
 const DEFAULT_CONFIG: Omit<PhalanxConfig, 'projectRoot'> = {
   dbPath: '.phalanx/phalanx.db',
-  dashboardPort: 3000,
+  dashboardPort: 18080,
   logPath: '.phalanx/phalanx.log',
   llm: DEFAULT_LLM,
   daemon: DEFAULT_DAEMON,

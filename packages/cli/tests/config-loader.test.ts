@@ -22,7 +22,7 @@ describe('config-loader', () => {
       expect(existsSync(join(tempDir, '.phalanx'))).toBe(true);
       expect(existsSync(join(tempDir, '.phalanx/config.json'))).toBe(true);
       expect(config.projectRoot).toBe(tempDir);
-      expect(config.dashboardPort).toBe(3000);
+      expect(config.dashboardPort).toBe(18080);
     });
 
     it('should include default llm and daemon settings', () => {

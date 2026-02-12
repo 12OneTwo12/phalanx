@@ -27,7 +27,7 @@ function makeConfig(overrides: Partial<PhalanxConfig['llm']> = {}): PhalanxConfi
   return {
     projectRoot: '/tmp/test',
     dbPath: '.phalanx/phalanx.db',
-    dashboardPort: 3000,
+    dashboardPort: 18080,
     logPath: '.phalanx/phalanx.log',
     llm: {
       systemDefault: DEFAULT_MODEL,
