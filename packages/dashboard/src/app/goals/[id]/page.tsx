@@ -1,6 +1,6 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState, useCallback } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/api-client';
 import type { Goal, Epic, Ticket } from '@phalanx/core';
@@ -23,7 +23,30 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 export default function GoalDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data: goal, isLoading } = useSWR<GoalDetail>(`/api/goals/${id}`, fetcher);
+  const { data: goal, isLoading, mutate } = useSWR<GoalDetail>(`/api/goals/${id}`, fetcher);
+  const [decomposing, setDecomposing] = useState(false);
+  const [decomposeError, setDecomposeError] = useState<string | null>(null);
+
+  const handleDecompose = useCallback(async () => {
+    setDecomposing(true);
+    setDecomposeError(null);
+    try {
+      const res = await fetch(`/api/goals/${id}/decompose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'llm' }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(data.error || 'Decomposition failed');
+      }
+      await mutate();
+    } catch (err) {
+      setDecomposeError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setDecomposing(false);
+    }
+  }, [id, mutate]);
 
   if (isLoading) return <p className="text-gray-500">Loading...</p>;
   if (!goal) return <p className="text-gray-500">Goal not found</p>;
@@ -34,13 +57,30 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
         ← Back to Goals
       </Link>
       <h2 className="mb-2 text-2xl font-bold">{goal.description}</h2>
-      <div className="mb-6 text-sm text-gray-400">
-        Status: <span className="font-medium text-gray-200">{goal.status}</span> · Progress:{' '}
-        <span className="font-medium text-gray-200">{Math.round(goal.progress * 100)}%</span>
+      <div className="mb-6 flex items-center gap-4 text-sm text-gray-400">
+        <span>
+          Status: <span className="font-medium text-gray-200">{goal.status}</span> · Progress:{' '}
+          <span className="font-medium text-gray-200">{Math.round(goal.progress * 100)}%</span>
+        </span>
+        {goal.epics.length === 0 && (
+          <button
+            onClick={handleDecompose}
+            disabled={decomposing}
+            className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {decomposing ? '🔄 Decomposing...' : '🧩 Decompose Goal'}
+          </button>
+        )}
       </div>
 
+      {decomposeError && (
+        <div className="mb-4 rounded-md border border-red-800 bg-red-900/30 p-3 text-sm text-red-300">
+          {decomposeError}
+        </div>
+      )}
+
       {goal.epics.length === 0 ? (
-        <p className="text-gray-500">No epics decomposed yet.</p>
+        <p className="text-gray-500">No epics decomposed yet. Click &quot;Decompose Goal&quot; to auto-generate epics and tickets using AI.</p>
       ) : (
         <div className="space-y-6">
           {goal.epics.map((epic) => (
