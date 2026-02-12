@@ -8,3 +8,4 @@ export * from './conventions/index.js';
 export * from './engine/index.js';
 export * from './heartbeat/index.js';
 export * from './channel/index.js';
+export * from './skills/index.js';
