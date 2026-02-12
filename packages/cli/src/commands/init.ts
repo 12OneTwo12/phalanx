@@ -17,7 +17,8 @@ export const initCommand = new Command('init')
     const projectRoot = resolve(opts.dir);
     const configDir = join(projectRoot, '.phalanx');
 
-    if (existsSync(configDir)) {
+    const configFile = join(configDir, 'config.json');
+    if (existsSync(configFile)) {
       logger.warn('Phalanx is already initialized in this directory.');
       logger.dim('Run "phalanx config" to reconfigure.');
       return;
