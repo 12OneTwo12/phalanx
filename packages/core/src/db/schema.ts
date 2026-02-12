@@ -240,3 +240,142 @@ export const heartbeatLogs = sqliteTable('heartbeat_logs', {
 
 export type HeartbeatLog = typeof heartbeatLogs.$inferSelect;
 export type NewHeartbeatLog = typeof heartbeatLogs.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Provider Configs
+// ---------------------------------------------------------------------------
+
+export const providerConfigs = sqliteTable('provider_configs', {
+  id: text('id').primaryKey(),
+  type: text('type', {
+    enum: ['anthropic', 'openai', 'ollama', 'gemini', 'custom'],
+  }).notNull(),
+  name: text('name').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  defaultModel: text('default_model'),
+  baseUrl: text('base_url'),
+  metadata: text('metadata'),
+  ...timestamps,
+});
+
+export type ProviderConfigRow = typeof providerConfigs.$inferSelect;
+export type NewProviderConfigRow = typeof providerConfigs.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Credentials
+// ---------------------------------------------------------------------------
+
+export const credentials = sqliteTable('credentials', {
+  id: text('id').primaryKey(),
+  providerConfigId: text('provider_config_id')
+    .references(() => providerConfigs.id, { onDelete: 'cascade' }),
+  service: text('service').notNull(),
+  encryptedValue: text('encrypted_value').notNull(),
+  status: text('status', { enum: ['active', 'revoked', 'expired'] })
+    .notNull()
+    .default('active'),
+  expiresAt: text('expires_at'),
+  ...timestamps,
+});
+
+export type Credential = typeof credentials.$inferSelect;
+export type NewCredential = typeof credentials.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Escalations
+// ---------------------------------------------------------------------------
+
+export const escalations = sqliteTable('escalations', {
+  id: text('id').primaryKey(),
+  type: text('type', {
+    enum: ['resource_access', 'cost_gate', 'decision_deadlock', 'alert'],
+  }).notNull(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  options: text('options'),
+  requestedBy: text('requested_by'),
+  status: text('status', { enum: ['pending', 'resolved', 'dismissed'] })
+    .notNull()
+    .default('pending'),
+  userResponse: text('user_response'),
+  blockedTasks: text('blocked_tasks'),
+  resolvedAt: text('resolved_at'),
+  ...timestamps,
+});
+
+export type Escalation = typeof escalations.$inferSelect;
+export type NewEscalation = typeof escalations.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Work Logs
+// ---------------------------------------------------------------------------
+
+export const workLogs = sqliteTable('work_logs', {
+  id: text('id').primaryKey(),
+  date: text('date').notNull(),
+  agentId: text('agent_id').references(() => agents.id, { onDelete: 'set null' }),
+  ticketId: text('ticket_id').references(() => tickets.id, { onDelete: 'set null' }),
+  action: text('action', {
+    enum: ['started', 'progressed', 'completed', 'blocked'],
+  }).notNull(),
+  description: text('description').notNull(),
+  tokensUsed: integer('tokens_used').default(0),
+  ...timestamps,
+});
+
+export type WorkLog = typeof workLogs.$inferSelect;
+export type NewWorkLog = typeof workLogs.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Decision Records
+// ---------------------------------------------------------------------------
+
+export const decisionRecords = sqliteTable('decision_records', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  what: text('what').notNull(),
+  why: text('why').notNull(),
+  alternatives: text('alternatives'),
+  evidence: text('evidence'),
+  madeBy: text('made_by').notNull(),
+  relatedTicketId: text('related_ticket_id')
+    .references(() => tickets.id, { onDelete: 'set null' }),
+  ...timestamps,
+});
+
+export type DecisionRecord = typeof decisionRecords.$inferSelect;
+export type NewDecisionRecord = typeof decisionRecords.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Knowledge Entries
+// ---------------------------------------------------------------------------
+
+export const knowledgeEntries = sqliteTable('knowledge_entries', {
+  id: text('id').primaryKey(),
+  category: text('category', {
+    enum: ['architecture', 'pattern', 'failure', 'research', 'context'],
+  }).notNull(),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  learnedFrom: text('learned_from'),
+  createdBy: text('created_by').notNull(),
+  ...timestamps,
+});
+
+export type KnowledgeEntry = typeof knowledgeEntries.$inferSelect;
+export type NewKnowledgeEntry = typeof knowledgeEntries.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Channel Messages
+// ---------------------------------------------------------------------------
+
+export const channelMessages = sqliteTable('channel_messages', {
+  id: text('id').primaryKey(),
+  role: text('role', { enum: ['user', 'team-lead'] }).notNull(),
+  content: text('content').notNull(),
+  metadata: text('metadata'),
+  ...timestamps,
+});
+
+export type ChannelMessage = typeof channelMessages.$inferSelect;
+export type NewChannelMessage = typeof channelMessages.$inferInsert;

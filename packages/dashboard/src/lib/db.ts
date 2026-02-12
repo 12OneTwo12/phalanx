@@ -6,6 +6,7 @@
 import {
   DatabaseManager,
   migrateUp,
+  migrateUp0002,
   GoalRepository,
   EpicRepository,
   TicketRepository,
@@ -16,6 +17,13 @@ import {
   ProposalRepository,
   ReverseProposalRepository,
   HeartbeatLogRepository,
+  ProviderConfigRepository,
+  CredentialRepository,
+  EscalationRepository,
+  WorkLogRepository,
+  DecisionRecordRepository,
+  KnowledgeEntryRepository,
+  ChannelMessageRepository,
 } from '@phalanx/core';
 
 const DB_PATH = process.env.PHALANX_DB_PATH ?? 'phalanx.db';
@@ -27,6 +35,7 @@ export function getDb(): DatabaseManager {
   const db = DatabaseManager.getInstance({ path: DB_PATH });
   if (!migrated) {
     migrateUp(db);
+    migrateUp0002(db);
     migrated = true;
   }
   return db;
@@ -71,4 +80,32 @@ export function getReverseProposalRepository() {
 
 export function getHeartbeatLogRepository() {
   return new HeartbeatLogRepository(getDb().orm);
+}
+
+export function getProviderConfigRepository() {
+  return new ProviderConfigRepository(getDb().orm);
+}
+
+export function getCredentialRepository() {
+  return new CredentialRepository(getDb().orm);
+}
+
+export function getEscalationRepository() {
+  return new EscalationRepository(getDb().orm);
+}
+
+export function getWorkLogRepository() {
+  return new WorkLogRepository(getDb().orm);
+}
+
+export function getDecisionRecordRepository() {
+  return new DecisionRecordRepository(getDb().orm);
+}
+
+export function getKnowledgeEntryRepository() {
+  return new KnowledgeEntryRepository(getDb().orm);
+}
+
+export function getChannelMessageRepository() {
+  return new ChannelMessageRepository(getDb().orm);
 }
