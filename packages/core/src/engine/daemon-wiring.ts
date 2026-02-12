@@ -121,17 +121,20 @@ export class DaemonWiring {
       eventBus?.emit('verification:failed', { ticketId: data.ticketId, feedback: data.feedback });
     });
 
-    // 5. Ticket approved (enters backlog) → smart assign
+    // 5. Backlog → smart assign on every scheduler tick
+    //    Previously this only fired on `ticket:started`, creating a deadlock:
+    //    backlog tickets never got assigned because `ticket:started` only fires
+    //    when an already-assigned ticket begins execution.
+    //    Fix: scan backlog on every scheduler tick to assign idle agents.
     if (smartAssignment) {
       const sa = smartAssignment;
-      // Listen for approval events from the approval flow
-      // When a ticket enters backlog, auto-assign via smart assignment
-      this.on(orchestrator, 'ticket:started', () => {
-        // Check for any unassigned backlog tickets and assign them
+      const { orchestratorScheduler } = this.deps;
+
+      this.on(orchestratorScheduler, 'scheduler:tick', () => {
         const backlog = ticketRepo.findByStatus('backlog');
         for (const ticket of backlog) {
-          void sa.smartAssign(ticket.id).catch(() => {
-            // Assignment failure is non-fatal; will retry on next tick
+          void sa.smartAssign(ticket.id).catch((err) => {
+            console.warn(`[phalanx] Smart assignment failed for ticket ${ticket.id}:`, err);
           });
         }
       });

@@ -84,6 +84,8 @@ export class Orchestrator extends EventEmitter {
         this.emit('ticket:failed', { ticketId: ticket.id, error: result.error });
       }
     } catch (err) {
+      // Log the error for debugging — previously silent, making diagnosis impossible
+      console.error(`[phalanx] Ticket ${ticket.id} execution failed:`, err);
       // Unexpected error → attempt state machine transition, fallback to direct update
       try {
         const currentTicket = this.ticketRepo.findById(ticket.id);

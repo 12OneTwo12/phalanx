@@ -128,8 +128,9 @@ export class SmartAssignmentService {
       if (jsonMatch) {
         return TicketAnalysisSchema.parse(JSON.parse(jsonMatch[0]));
       }
-    } catch {
+    } catch (err) {
       // Fall through to rule-based fallback
+      console.warn('[phalanx] LLM ticket analysis failed, using rule-based fallback:', err);
     }
 
     return this.fallbackAnalysis(title, description, priority);
