@@ -17,6 +17,11 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/heartbeat', label: 'Heartbeat', icon: '💓' },
   { href: '/activity', label: 'Activity', icon: '📜' },
   { href: '/conventions', label: 'Conventions', icon: '📐' },
+  { href: '/work-logs', label: 'Work Logs', icon: '📋' },
+  { href: '/decisions', label: 'Decisions', icon: '⚖️' },
+  { href: '/knowledge', label: 'Knowledge', icon: '📚' },
+  { href: '/debates', label: 'Debates', icon: '🗣️' },
+  { href: '/meetings', label: 'Meetings', icon: '📅' },
 ];
 
 export function Sidebar() {
