@@ -144,6 +144,12 @@ export const terminalExecTool: Tool<typeof schema> = {
         cwd: context.workingDirectory,
         timeout: timeoutMs,
         maxBuffer: 10 * 1024 * 1024, // 10 MB
+        env: {
+          ...process.env,
+          GIT_EDITOR: 'true',
+          GIT_PAGER: 'cat',
+          GIT_TERMINAL_PROMPT: '0',
+        },
       });
 
       let output = (stdout + stderr).trim();

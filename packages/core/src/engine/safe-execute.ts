@@ -98,3 +98,25 @@ export class RecoveryManager {
     this.states.clear();
   }
 }
+
+// ---------------------------------------------------------------------------
+// cancelAllRunning
+// ---------------------------------------------------------------------------
+
+/**
+ * Emergency stop: set all running agents to error status.
+ * Used when the system needs to halt all in-flight operations.
+ */
+export function cancelAllRunning(
+  agentRepo: { findAll(): Array<{ id: string; status: string }>; update(id: string, data: { status: string }): unknown },
+): number {
+  const agents = agentRepo.findAll();
+  let cancelled = 0;
+  for (const agent of agents) {
+    if (agent.status === 'running') {
+      agentRepo.update(agent.id, { status: 'error' });
+      cancelled++;
+    }
+  }
+  return cancelled;
+}
