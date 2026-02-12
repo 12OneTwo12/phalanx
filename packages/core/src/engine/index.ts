@@ -43,3 +43,10 @@ export {
 } from './smart-assignment-service.js';
 export { CompletionHandler } from './completion-handler.js';
 export { DaemonWiring, type DaemonDeps } from './daemon-wiring.js';
+export {
+  safeExecute,
+  RecoveryManager,
+  type Result,
+  type SafeExecuteContext,
+  type RecoveryState,
+} from './safe-execute.js';
