@@ -480,6 +480,12 @@ export const channelMessages = sqliteTable('channel_messages', {
   id: text('id').primaryKey(),
   role: text('role', { enum: ['user', 'team-lead'] }).notNull(),
   content: text('content').notNull(),
+  channelProvider: text('channel_provider').notNull().default('web'),
+  channelId: text('channel_id').notNull().default('dashboard'),
+  senderId: text('sender_id'),
+  senderName: text('sender_name'),
+  replyToId: text('reply_to_id'),
+  threadId: text('thread_id'),
   metadata: text('metadata'),
   ...timestamps,
 });
