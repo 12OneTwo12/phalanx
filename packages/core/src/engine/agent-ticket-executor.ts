@@ -98,12 +98,10 @@ export class AgentTicketExecutor implements TicketExecutor {
    * 4. Converting result to TicketExecutor format
    */
   async execute(ticket: Ticket): Promise<{ success: boolean; error?: string }> {
-    let branchName: string | undefined;
-
     try {
       // Create isolated branch for this ticket
       // Delegate slug normalization to BranchManager (single source of truth)
-      branchName = await this.branchManager.createTicketBranch(ticket.id, ticket.title);
+      await this.branchManager.createTicketBranch(ticket.id, ticket.title);
 
       // Build agent config
       const resolved = this.configResolver.resolve(ticket, this.config);

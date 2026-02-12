@@ -18,7 +18,7 @@ export interface GeneratorOptions {
 export class ConventionGenerator {
   private readonly conventionPath: string;
 
-  constructor(private readonly options: GeneratorOptions) {
+  constructor(options: GeneratorOptions) {
     this.conventionPath = path.join(options.projectDir, options.conventionDir ?? '.phalanx');
   }
 

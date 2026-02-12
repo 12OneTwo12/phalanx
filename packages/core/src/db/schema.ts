@@ -161,8 +161,8 @@ export const tokenUsage = sqliteTable('token_usage', {
   ...timestamps,
 });
 
-export type TokenUsageRecord = typeof tokenUsage.$inferSelect;
-export type NewTokenUsageRecord = typeof tokenUsage.$inferInsert;
+export type TokenUsageRow = typeof tokenUsage.$inferSelect;
+export type NewTokenUsageRow = typeof tokenUsage.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // Conventions

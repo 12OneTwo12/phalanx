@@ -89,9 +89,8 @@ export class AgentExecutor {
       }
 
       // Call LLM with retry for transient errors
-      let result: ToolCallResult;
+      let result: ToolCallResult | undefined;
       let lastError: unknown;
-      let succeeded = false;
 
       for (let attempt = 0; attempt <= MAX_LLM_RETRIES; attempt++) {
         try {
@@ -104,7 +103,6 @@ export class AgentExecutor {
             maxTokens: 4096,
             temperature: config.temperature,
           });
-          succeeded = true;
           break;
         } catch (error) {
           lastError = error;
@@ -115,7 +113,7 @@ export class AgentExecutor {
         }
       }
 
-      if (!succeeded) {
+      if (!result) {
         return this.buildResult(
           'error',
           '',

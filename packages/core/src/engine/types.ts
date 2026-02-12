@@ -147,11 +147,11 @@ export type VerificationStatus = z.infer<typeof VerificationStatus>;
 export interface VerificationResult {
   ticketId: string;
   status: VerificationStatus;
-  checks: VerificationCheck[];
+  checks: VerificationCheckResult[];
   feedback?: string;
 }
 
-export interface VerificationCheck {
+export interface VerificationCheckResult {
   name: string;
   passed: boolean;
   details?: string;
