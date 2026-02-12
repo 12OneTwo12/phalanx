@@ -4,7 +4,8 @@
  */
 import type { Ticket } from '../db/schema.js';
 import type { AgentExecutor } from '../agents/agent-executor.js';
-import type { AgentConfig, AgentRole, AgentSoulConfig } from '../agents/types.js';
+import type { AgentConfig, AgentRole } from '../agents/types.js';
+import type { SoulLoader } from '../agents/soul-loader.js';
 import type { ResolvedModel, ThinkingLevel } from '../llm/types.js';
 import type { AgentToolPermissions } from '../tools/types.js';
 import type { TicketExecutor } from './orchestrator.js';
@@ -87,6 +88,7 @@ export class AgentTicketExecutor implements TicketExecutor {
     private readonly agentExecutor: AgentExecutor,
     private readonly branchManager: BranchManager,
     private readonly config: AgentTicketExecutorConfig,
+    private readonly soulLoader: SoulLoader,
     private readonly configResolver: AgentConfigResolver = new DefaultAgentConfigResolver(),
   ) {}
 
@@ -103,9 +105,9 @@ export class AgentTicketExecutor implements TicketExecutor {
       // Delegate slug normalization to BranchManager (single source of truth)
       await this.branchManager.createTicketBranch(ticket.id, ticket.title);
 
-      // Build agent config
+      // Build agent config (loads soul from templates)
       const resolved = this.configResolver.resolve(ticket, this.config);
-      const agentConfig = this.buildAgentConfig(ticket, resolved);
+      const agentConfig = await this.buildAgentConfig(ticket, resolved);
 
       // Build task prompt with ticket context
       const task = this.buildTaskPrompt(ticket);
@@ -129,16 +131,12 @@ export class AgentTicketExecutor implements TicketExecutor {
     }
   }
 
-  private buildAgentConfig(
+  private async buildAgentConfig(
     ticket: Ticket,
     resolved: { role: AgentRole; model: ResolvedModel; thinkingLevel: ThinkingLevel },
-  ): AgentConfig {
-    const soul: AgentSoulConfig = {
-      soul: '',
-      identity: `You are a ${resolved.role} agent working on ticket ${ticket.id}.`,
-      memory: '',
-      skills: '',
-    };
+  ): Promise<AgentConfig> {
+    // Load soul/identity/memory/skills from templates/{role}/
+    const soul = await this.soulLoader.load(resolved.role);
 
     return {
       id: `ticket-${ticket.id}`,
@@ -149,6 +147,7 @@ export class AgentTicketExecutor implements TicketExecutor {
       workingDirectory: this.config.workingDirectory,
       maxIterations: this.config.maxIterations,
       thinkingLevel: resolved.thinkingLevel,
+      conventions: this.config.conventions,
     };
   }
 

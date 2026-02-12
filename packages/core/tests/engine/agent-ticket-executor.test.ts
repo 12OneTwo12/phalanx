@@ -3,6 +3,7 @@ import { AgentTicketExecutor, DefaultAgentConfigResolver } from '../../src/engin
 import type { AgentTicketExecutorConfig } from '../../src/engine/agent-ticket-executor.js';
 import type { BranchManager } from '../../src/engine/branch-manager.js';
 import type { AgentExecutor } from '../../src/agents/agent-executor.js';
+import type { SoulLoader } from '../../src/agents/soul-loader.js';
 import type { Ticket } from '../../src/db/schema.js';
 
 function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
@@ -54,6 +55,17 @@ function makeMockAgentExecutor(): AgentExecutor {
   } as unknown as AgentExecutor;
 }
 
+function makeMockSoulLoader(): SoulLoader {
+  return {
+    load: vi.fn(async () => ({
+      soul: 'Test soul',
+      identity: 'Test identity',
+      memory: 'Test memory',
+      skills: 'Test skills',
+    })),
+  } as unknown as SoulLoader;
+}
+
 const defaultConfig: AgentTicketExecutorConfig = {
   defaultModel: { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929', fullId: 'anthropic/claude-sonnet-4-5-20250929' } as any,
   defaultThinkingLevel: 'low',
@@ -66,12 +78,14 @@ const defaultConfig: AgentTicketExecutorConfig = {
 describe('AgentTicketExecutor', () => {
   let executor: AgentExecutor;
   let branchManager: BranchManager;
+  let soulLoader: SoulLoader;
   let ticketExecutor: AgentTicketExecutor;
 
   beforeEach(() => {
     executor = makeMockAgentExecutor();
     branchManager = makeMockBranchManager();
-    ticketExecutor = new AgentTicketExecutor(executor, branchManager, defaultConfig);
+    soulLoader = makeMockSoulLoader();
+    ticketExecutor = new AgentTicketExecutor(executor, branchManager, defaultConfig, soulLoader);
   });
 
   it('should execute a ticket successfully', async () => {
@@ -106,7 +120,7 @@ describe('AgentTicketExecutor', () => {
 
   it('should inject conventions into task prompt when available', async () => {
     const configWithConventions = { ...defaultConfig, conventions: 'Use kebab-case' };
-    ticketExecutor = new AgentTicketExecutor(executor, branchManager, configWithConventions);
+    ticketExecutor = new AgentTicketExecutor(executor, branchManager, configWithConventions, soulLoader);
 
     await ticketExecutor.execute(makeTicket());
 
