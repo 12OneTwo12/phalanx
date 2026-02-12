@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
 import { createLLMStack, type LLMProvider, type ProviderConfig } from '@phalanx/core';
+import { findProjectRoot } from './convention-sync';
 
 // ---------------------------------------------------------------------------
 // Credential store reader (mirrors CLI's credential-store.ts)
@@ -42,7 +43,7 @@ interface ProjectLLMConfig {
 }
 
 function loadProjectLLMConfig(): ProjectLLMConfig {
-  const projectRoot = process.env.PHALANX_PROJECT_ROOT;
+  const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? findProjectRoot(process.cwd());
   if (!projectRoot) return {};
 
   const configPath = resolve(projectRoot, '.phalanx', 'config.json');

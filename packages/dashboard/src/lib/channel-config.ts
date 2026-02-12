@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import type { ChannelsConfig } from '@phalanx/core';
+import { findProjectRoot } from './convention-sync';
 
 /** Default channels config — web is always enabled. */
 const DEFAULT_CHANNELS_CONFIG: ChannelsConfig = {
@@ -18,7 +19,7 @@ const DEFAULT_CHANNELS_CONFIG: ChannelsConfig = {
  * Falls back to default config (web-only) if not found or malformed.
  */
 export function loadChannelsConfig(): ChannelsConfig {
-  const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? process.cwd();
+  const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? findProjectRoot(process.cwd());
   const configPath = resolve(projectRoot, '.phalanx', 'config.json');
 
   if (!existsSync(configPath)) {

@@ -21,6 +21,7 @@ import {
   type AgentExecutionResult,
 } from '@phalanx/core';
 import { DASHBOARD_TOOLS } from './tools/index';
+import { findProjectRoot } from './convention-sync';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -103,7 +104,7 @@ export function createTeamLeadAgent(
   model: string,
   config?: TeamLeadAgentConfig,
 ) {
-  const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? process.cwd();
+  const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? findProjectRoot(process.cwd());
   const templatesDir = config?.templatesDir ?? path.join(projectRoot, 'templates');
   const soulLoader = new SoulLoader(templatesDir);
   const conventionLoader = new ConventionLoader(projectRoot);

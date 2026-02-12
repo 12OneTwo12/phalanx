@@ -3,9 +3,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { SkillLoader, SkillRegistry } from '@phalanx/core';
 import type { AgentRole } from '@phalanx/core';
+import { findProjectRoot } from '@/lib/convention-sync';
 
 function getProjectRoot(): string {
-  return process.env.PHALANX_PROJECT_ROOT ?? process.cwd();
+  return process.env.PHALANX_PROJECT_ROOT ?? findProjectRoot(process.cwd());
 }
 
 function loadRegistry(): SkillRegistry {

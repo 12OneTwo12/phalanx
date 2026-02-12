@@ -3,12 +3,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Tool, ToolResult, ToolExecutionContext } from '@phalanx/core';
 import { SkillLoader, SkillRegistry } from '@phalanx/core';
+import { findProjectRoot } from '../convention-sync';
 
 // Singleton registry, lazily initialized
 let _registry: SkillRegistry | null = null;
 
 function getProjectRoot(): string {
-  return process.env.PHALANX_PROJECT_ROOT ?? process.cwd();
+  return process.env.PHALANX_PROJECT_ROOT ?? findProjectRoot(process.cwd());
 }
 
 function getRegistry(): SkillRegistry {

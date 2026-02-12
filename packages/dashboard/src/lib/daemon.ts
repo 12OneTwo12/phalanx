@@ -47,6 +47,7 @@ import {
 } from './db';
 import { eventBus } from './event-bus';
 import { getLLMProvider } from './llm-provider';
+import { findProjectRoot } from './convention-sync';
 
 // ---------------------------------------------------------------------------
 // globalThis guard for HMR
@@ -89,7 +90,7 @@ const passthroughVerification = {
 // ---------------------------------------------------------------------------
 
 function createDaemonWiring(): DaemonState {
-  const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? process.cwd();
+  const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? findProjectRoot(process.cwd());
   const templatesDir = `${projectRoot}/templates`;
 
   // Repositories
