@@ -84,7 +84,8 @@ export class MemoryWriter {
     // Use the exact formatted pattern to avoid false positives from substring matching.
     const existingLines = new Set(existing.split('\n').map(l => l.trim()));
     const newEntries = entries.filter(e => {
-      const formatted = `- **[${e.category}]** ${e.content}`;
+      const ticketTag = e.ticketId ? ` _(${e.ticketId})_` : '';
+      const formatted = `- **[${e.category}]** ${e.content}${ticketTag}`;
       return !existingLines.has(formatted);
     });
     if (newEntries.length === 0) return 0;

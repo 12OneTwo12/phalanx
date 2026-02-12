@@ -54,14 +54,13 @@ export class CompletionHandler extends EventEmitter {
         const progress = this.goalManager.calculateProgress(epic.goalId);
         this.emit('goal:progressUpdated', { goalId: epic.goalId, progress });
       }
+      this.emit('ticket:completed', { ticketId });
     } finally {
       // Agent release must happen regardless of goal progress errors
       if (ticket.assignedAgentId) {
         this.assignmentService.release(ticket.assignedAgentId);
       }
     }
-
-    this.emit('ticket:completed', { ticketId });
   }
 
   /**
@@ -85,13 +84,12 @@ export class CompletionHandler extends EventEmitter {
         status: 'pending',
         blockedTasks: JSON.stringify([ticketId]),
       });
+      this.emit('ticket:escalated', { ticketId });
     } finally {
       // Agent release must happen regardless of escalation record creation errors
       if (ticket.assignedAgentId) {
         this.assignmentService.release(ticket.assignedAgentId);
       }
     }
-
-    this.emit('ticket:escalated', { ticketId });
   }
 }
