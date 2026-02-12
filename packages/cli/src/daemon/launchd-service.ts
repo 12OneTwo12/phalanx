@@ -15,6 +15,7 @@ function getPlistPath(): string {
 }
 
 function buildPlist(opts: DaemonInstallOpts): string {
+  const extraArgs = (opts.args ?? []).map((a) => `    <string>${a}</string>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -25,6 +26,7 @@ function buildPlist(opts: DaemonInstallOpts): string {
   <array>
     <string>${opts.nodePath}</string>
     <string>${opts.entryPath}</string>
+${extraArgs}
   </array>
   <key>WorkingDirectory</key>
   <string>${opts.workDir}</string>

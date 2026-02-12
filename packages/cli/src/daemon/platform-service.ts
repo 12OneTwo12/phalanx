@@ -9,6 +9,8 @@ export interface DaemonInstallOpts {
   nodePath: string;
   /** Path to the daemon entry script */
   entryPath: string;
+  /** Arguments to pass after the entry script */
+  args?: string[];
   /** Working directory */
   workDir: string;
   /** Log file path */

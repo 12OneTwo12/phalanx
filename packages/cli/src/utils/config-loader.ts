@@ -79,7 +79,9 @@ export function findProjectRoot(from: string = process.cwd()): string | null {
   let dir = resolve(from);
 
   while (true) {
-    if (existsSync(join(dir, CONFIG_DIR))) {
+    // Check for config.json to distinguish project roots from the
+    // global credential store (~/.phalanx/credentials.json)
+    if (existsSync(join(dir, CONFIG_DIR, CONFIG_FILE))) {
       return dir;
     }
     const parent = resolve(dir, '..');

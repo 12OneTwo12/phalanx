@@ -35,7 +35,7 @@ export class PidFileService implements DaemonService {
       throw new Error('Daemon not installed. Run "phalanx init" first.');
     }
 
-    const child = fork(this.opts.entryPath, [], {
+    const child = fork(this.opts.entryPath, this.opts.args ?? [], {
       cwd: this.opts.workDir,
       detached: true,
       stdio: 'ignore',

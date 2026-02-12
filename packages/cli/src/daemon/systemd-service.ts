@@ -21,7 +21,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=${opts.nodePath} ${opts.entryPath}
+ExecStart=${opts.nodePath} ${opts.entryPath} ${(opts.args ?? []).join(' ')}
 WorkingDirectory=${opts.workDir}
 Restart=on-failure
 RestartSec=10
