@@ -389,6 +389,90 @@ export type TicketComment = typeof ticketComments.$inferSelect;
 export type NewTicketComment = typeof ticketComments.$inferInsert;
 
 // ---------------------------------------------------------------------------
+// Debates
+// ---------------------------------------------------------------------------
+
+export const debates = sqliteTable('debates', {
+  id: text('id').primaryKey(),
+  topic: text('topic').notNull(),
+  roleGroup: text('role_group').notNull(), // e.g. 'backend', 'frontend', 'qa'
+  status: text('status', { enum: ['pending', 'active', 'concluded'] })
+    .notNull()
+    .default('pending'),
+  initiatorId: text('initiator_id').references(() => agents.id, { onDelete: 'set null' }),
+  conclusion: text('conclusion'), // LLM-generated conclusion
+  metadata: text('metadata'), // JSON
+  ...timestamps,
+});
+
+export type Debate = typeof debates.$inferSelect;
+export type NewDebate = typeof debates.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Debate Arguments
+// ---------------------------------------------------------------------------
+
+export const debateArguments = sqliteTable('debate_arguments', {
+  id: text('id').primaryKey(),
+  debateId: text('debate_id')
+    .notNull()
+    .references(() => debates.id, { onDelete: 'cascade' }),
+  agentId: text('agent_id')
+    .notNull()
+    .references(() => agents.id, { onDelete: 'cascade' }),
+  position: text('position').notNull(), // e.g. 'for', 'against', 'neutral'
+  argument: text('argument').notNull(),
+  evidence: text('evidence'), // Supporting evidence
+  round: integer('round').notNull().default(1),
+  ...timestamps,
+});
+
+export type DebateArgument = typeof debateArguments.$inferSelect;
+export type NewDebateArgument = typeof debateArguments.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Meetings
+// ---------------------------------------------------------------------------
+
+export const meetings = sqliteTable('meetings', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  type: text('type', { enum: ['standup', 'review', 'planning', 'retrospective'] }).notNull(),
+  status: text('status', { enum: ['scheduled', 'active', 'completed'] })
+    .notNull()
+    .default('scheduled'),
+  facilitatorId: text('facilitator_id').references(() => agents.id, { onDelete: 'set null' }),
+  agenda: text('agenda'), // Markdown
+  minutes: text('minutes'), // LLM-generated minutes
+  summary: text('summary'), // Brief summary
+  metadata: text('metadata'), // JSON
+  ...timestamps,
+});
+
+export type Meeting = typeof meetings.$inferSelect;
+export type NewMeeting = typeof meetings.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Meeting Participants
+// ---------------------------------------------------------------------------
+
+export const meetingParticipants = sqliteTable('meeting_participants', {
+  id: text('id').primaryKey(),
+  meetingId: text('meeting_id')
+    .notNull()
+    .references(() => meetings.id, { onDelete: 'cascade' }),
+  agentId: text('agent_id')
+    .notNull()
+    .references(() => agents.id, { onDelete: 'cascade' }),
+  role: text('role').notNull(), // e.g. 'presenter', 'participant', 'observer'
+  contributions: text('contributions'), // Markdown: what this agent contributed
+  ...timestamps,
+});
+
+export type MeetingParticipant = typeof meetingParticipants.$inferSelect;
+export type NewMeetingParticipant = typeof meetingParticipants.$inferInsert;
+
+// ---------------------------------------------------------------------------
 // Channel Messages
 // ---------------------------------------------------------------------------
 
