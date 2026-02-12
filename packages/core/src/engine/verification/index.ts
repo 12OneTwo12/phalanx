@@ -6,3 +6,4 @@ export { LintCheckerCheck } from './checks/lint-checker.js';
 export { TypeCheckerCheck } from './checks/type-checker.js';
 export { ConventionCheckerCheck, type FileReader } from './checks/convention-checker.js';
 export { LLMCodeReviewCheck, type LLMReviewer } from './checks/llm-code-review.js';
+export { createQAVerificationStrategy, type QAVerificationFactoryDeps } from './qa-verification-factory.js';
