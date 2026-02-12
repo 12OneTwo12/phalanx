@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { SkillLoader, SkillRegistry } from '@phalanx/core';
+import type { AgentRole } from '@phalanx/core';
 
 function getProjectRoot(): string {
   return process.env.PHALANX_PROJECT_ROOT ?? process.cwd();
@@ -16,16 +19,15 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
     const registry = loadRegistry();
-    const skills = role
-      ? registry.getForRole(role as import('@phalanx/core').AgentRole)
-      : registry.list();
+    const skills = role ? registry.getForRole(role as AgentRole) : registry.list();
 
     const summary = skills.map((s) => ({
       name: s.name,
       description: s.description,
       source: s.source,
       roles: s.metadata?.roles ?? [],
-      path: s.path,
+      emoji: s.metadata?.emoji,
+      baseDir: s.baseDir,
     }));
 
     return NextResponse.json(summary);
@@ -41,42 +43,29 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, description, content, roles } = body;
+    const { name, description, content, metadata } = body;
 
     if (!name || !content) {
-      return NextResponse.json(
-        { error: 'name and content are required' },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'name and content are required' }, { status: 400 });
     }
 
-    const fs = await import('node:fs');
-    const path = await import('node:path');
     const projectRoot = getProjectRoot();
     const skillDir = path.join(projectRoot, 'skills', name);
 
     if (fs.existsSync(skillDir)) {
-      return NextResponse.json(
-        { error: `Skill already exists: ${name}` },
-        { status: 409 },
-      );
+      return NextResponse.json({ error: `Skill already exists: ${name}` }, { status: 409 });
     }
 
     fs.mkdirSync(skillDir, { recursive: true });
 
-    const frontmatter = ['---', `name: ${name}`, `description: ${description ?? ''}`];
-    if (roles && roles.length > 0) {
-      frontmatter.push('roles:');
-      for (const role of roles) {
-        frontmatter.push(`  - ${role}`);
-      }
+    // Build SKILL.md
+    const lines = ['---', `name: ${name}`, `description: ${description ?? ''}`];
+    if (metadata && Object.keys(metadata).length > 0) {
+      lines.push(`metadata: ${JSON.stringify({ phalanx: metadata })}`);
     }
-    frontmatter.push('---', '');
+    lines.push('---', '', content, '');
 
-    fs.writeFileSync(
-      path.join(skillDir, 'SKILL.md'),
-      frontmatter.join('\n') + '\n' + content + '\n',
-    );
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), lines.join('\n'));
 
     const registry = loadRegistry();
     const skill = registry.get(name);

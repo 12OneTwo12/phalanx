@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { SkillLoader, SkillRegistry } from '@phalanx/core';
 
 function getProjectRoot(): string {
@@ -45,26 +47,17 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const fs = await import('node:fs');
-    const path = await import('node:path');
-
     const desc = body.description ?? existing.description;
     const content = body.content ?? existing.content;
-    const roles = body.roles ?? existing.metadata?.roles;
+    const metadata = body.metadata ?? existing.metadata;
 
-    const frontmatter = ['---', `name: ${name}`, `description: ${desc}`];
-    if (roles && roles.length > 0) {
-      frontmatter.push('roles:');
-      for (const role of roles) {
-        frontmatter.push(`  - ${role}`);
-      }
+    const lines = ['---', `name: ${name}`, `description: ${desc}`];
+    if (metadata && Object.keys(metadata).length > 0) {
+      lines.push(`metadata: ${JSON.stringify({ phalanx: metadata })}`);
     }
-    frontmatter.push('---', '');
+    lines.push('---', '', content, '');
 
-    fs.writeFileSync(
-      path.join(existing.path, 'SKILL.md'),
-      frontmatter.join('\n') + '\n' + content + '\n',
-    );
+    fs.writeFileSync(path.join(existing.baseDir, 'SKILL.md'), lines.join('\n'));
 
     const updated = loadRegistry().get(name);
     return NextResponse.json(updated);
@@ -97,9 +90,7 @@ export async function DELETE(
       );
     }
 
-    const fs = await import('node:fs');
-    fs.rmSync(existing.path, { recursive: true, force: true });
-
+    fs.rmSync(existing.baseDir, { recursive: true, force: true });
     return NextResponse.json({ deleted: name });
   } catch (err) {
     return NextResponse.json(

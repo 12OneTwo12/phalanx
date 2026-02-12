@@ -1,33 +1,41 @@
 /**
  * SkillLoader — loads skills from SKILL.md files across multiple directories.
  *
- * Priority: workspace/skills > ~/.phalanx/skills > bundled skills
- * Skills with the same name from higher-priority sources override lower ones.
+ * Loading priority (highest wins):
+ *   1. workspace/skills/    (project-local)
+ *   2. ~/.phalanx/skills/   (managed/global)
+ *   3. bundled skills       (package-bundled)
+ *   4. extraDirs            (from config skills.load.extraDirs)
+ *   5. plugin skills        (future)
+ *
+ * Same-name skills from higher-priority sources override lower ones (Map.set).
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import type { Skill, SkillFrontmatter } from './types.js';
+import { execSync } from 'node:child_process';
+import type { SkillEntry, SkillsConfig } from './types.js';
+import { parseFrontmatter } from './frontmatter.js';
 
 const SKILL_FILENAME = 'SKILL.md';
 
 export interface SkillLoaderOptions {
   /** Project root directory */
   projectRoot?: string;
-  /** Extra directories to scan for skills */
-  extraDirs?: string[];
-  /** Path to bundled skills (defaults to <packageRoot>/skills) */
+  /** Skill configuration from phalanx config */
+  config?: SkillsConfig;
+  /** Path to bundled skills directory */
   bundledDir?: string;
 }
 
 export class SkillLoader {
   private readonly projectRoot?: string;
-  private readonly extraDirs: string[];
+  private readonly config: SkillsConfig;
   private readonly bundledDir?: string;
 
   constructor(options: SkillLoaderOptions = {}) {
     this.projectRoot = options.projectRoot;
-    this.extraDirs = options.extraDirs ?? [];
+    this.config = options.config ?? {};
     this.bundledDir = options.bundledDir;
   }
 
@@ -35,14 +43,15 @@ export class SkillLoader {
    * Load all skills from all directories with priority resolution.
    * Higher-priority sources override lower ones by name.
    */
-  loadAll(): Skill[] {
-    const skillMap = new Map<string, Skill>();
+  loadAll(): SkillEntry[] {
+    const skillMap = new Map<string, SkillEntry>();
 
-    // Load in reverse priority order (lowest first, highest overwrites)
+    // Load in priority order: lowest first, highest overwrites
     const sources = this.getSourceDirs();
     for (const { dir, source } of sources) {
       const skills = this.loadFromDir(dir, source);
       for (const skill of skills) {
+        if (!this.shouldIncludeSkill(skill)) continue;
         skillMap.set(skill.name, skill);
       }
     }
@@ -51,12 +60,13 @@ export class SkillLoader {
   }
 
   /**
-   * Load skills from a single directory. Each subdirectory containing SKILL.md is a skill.
+   * Load skills from a single directory.
+   * Each subdirectory containing SKILL.md is treated as a skill.
    */
-  loadFromDir(dir: string, source: Skill['source']): Skill[] {
+  loadFromDir(dir: string, source: SkillEntry['source']): SkillEntry[] {
     if (!fs.existsSync(dir)) return [];
 
-    const skills: Skill[] = [];
+    const skills: SkillEntry[] = [];
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -75,7 +85,7 @@ export class SkillLoader {
         const skill = this.parseSkillFile(skillFile, skillDir, source);
         if (skill) skills.push(skill);
       } catch {
-        // Skip malformed skills
+        // Skip malformed skills silently
       }
     }
 
@@ -83,15 +93,15 @@ export class SkillLoader {
   }
 
   /**
-   * Parse a single SKILL.md file into a Skill object.
+   * Parse a single SKILL.md file into a SkillEntry.
    */
   parseSkillFile(
     filePath: string,
     skillDir: string,
-    source: Skill['source'],
-  ): Skill | null {
+    source: SkillEntry['source'],
+  ): SkillEntry | null {
     const raw = fs.readFileSync(filePath, 'utf-8');
-    const { frontmatter, body } = this.parseFrontmatter(raw);
+    const { frontmatter, body } = parseFrontmatter(raw);
 
     const dirName = path.basename(skillDir);
     const name = frontmatter.name ?? dirName;
@@ -100,96 +110,88 @@ export class SkillLoader {
     return {
       name,
       description,
-      content: body.trim(),
-      metadata: {
-        bins: frontmatter.requires?.bins,
-        config: frontmatter.requires?.config,
-        roles: frontmatter.roles,
-      },
+      content: body,
+      filePath,
+      baseDir: skillDir,
+      metadata: frontmatter.metadata,
       source,
-      path: skillDir,
     };
   }
 
   /**
-   * Parse YAML frontmatter from a markdown string.
-   * Supports --- delimited frontmatter blocks.
+   * Check whether a skill should be included based on config and requirements.
+   *
+   * Checks:
+   * - `skills.entries.<name>.enabled: false` → skip
+   * - `skills.load.bundledAllowlist` → only allow listed bundled skills
+   * - `metadata.requires.bins` → check binaries on PATH
+   * - `metadata.requires.env` → check environment variables
    */
-  parseFrontmatter(raw: string): { frontmatter: SkillFrontmatter; body: string } {
-    const match = raw.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
-    if (!match) {
-      return { frontmatter: {}, body: raw };
+  shouldIncludeSkill(skill: SkillEntry): boolean {
+    // Check per-skill enabled flag
+    const entryConfig = this.config.entries?.[skill.name];
+    if (entryConfig?.enabled === false) return false;
+
+    // Check bundled allowlist
+    if (skill.source === 'bundled' && this.config.load?.bundledAllowlist) {
+      if (!this.config.load.bundledAllowlist.includes(skill.name)) return false;
     }
 
-    const yamlStr = match[1];
-    const body = match[2];
+    // Check required binaries
+    if (skill.metadata?.requires?.bins) {
+      for (const bin of skill.metadata.requires.bins) {
+        if (!this.isBinaryAvailable(bin)) return false;
+      }
+    }
 
-    // Simple YAML parser for flat/nested structures we need
-    const frontmatter: SkillFrontmatter = {};
+    // Check required environment variables
+    if (skill.metadata?.requires?.env) {
+      for (const envVar of skill.metadata.requires.env) {
+        if (!process.env[envVar]) return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if a binary is available on PATH.
+   */
+  private isBinaryAvailable(bin: string): boolean {
     try {
-      frontmatter.name = this.extractYamlString(yamlStr, 'name');
-      frontmatter.description = this.extractYamlString(yamlStr, 'description');
-      frontmatter.roles = this.extractYamlArray(yamlStr, 'roles');
-
-      // Parse requires block
-      const requiresMatch = yamlStr.match(/requires:\s*\n((?:\s+.*\n?)*)/);
-      if (requiresMatch) {
-        const reqBlock = requiresMatch[1];
-        frontmatter.requires = {
-          bins: this.extractYamlArray(reqBlock, 'bins'),
-          config: this.extractYamlArray(reqBlock, 'config'),
-        };
-      }
+      const cmd = process.platform === 'win32' ? `where ${bin}` : `which ${bin}`;
+      execSync(cmd, { stdio: 'ignore' });
+      return true;
     } catch {
-      // Return what we could parse
+      return false;
     }
-
-    return { frontmatter, body };
   }
 
-  private extractYamlString(yaml: string, key: string): string | undefined {
-    const match = yaml.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'));
-    return match ? match[1].trim().replace(/^["']|["']$/g, '') : undefined;
-  }
+  /**
+   * Build the ordered list of source directories (lowest priority first).
+   */
+  private getSourceDirs(): Array<{ dir: string; source: SkillEntry['source'] }> {
+    const dirs: Array<{ dir: string; source: SkillEntry['source'] }> = [];
 
-  private extractYamlArray(yaml: string, key: string): string[] | undefined {
-    const sectionMatch = yaml.match(new RegExp(`${key}:\\s*\\n((?:\\s+-\\s+.*\\n?)*)`, 'm'));
-    if (!sectionMatch) {
-      // Try inline array: key: [a, b, c]
-      const inlineMatch = yaml.match(new RegExp(`${key}:\\s*\\[([^\\]]+)\\]`, 'm'));
-      if (inlineMatch) {
-        return inlineMatch[1].split(',').map((s) => s.trim().replace(/^["']|["']$/g, ''));
+    // 5. Plugin skills — future, skip
+
+    // 4. Extra dirs (lowest active priority)
+    if (this.config.load?.extraDirs) {
+      for (const extra of this.config.load.extraDirs) {
+        dirs.push({ dir: extra, source: 'managed' });
       }
-      return undefined;
     }
 
-    const items: string[] = [];
-    const lines = sectionMatch[1].split('\n');
-    for (const line of lines) {
-      const itemMatch = line.match(/^\s+-\s+(.+)/);
-      if (itemMatch) items.push(itemMatch[1].trim().replace(/^["']|["']$/g, ''));
-    }
-    return items.length > 0 ? items : undefined;
-  }
-
-  private getSourceDirs(): Array<{ dir: string; source: Skill['source'] }> {
-    const dirs: Array<{ dir: string; source: Skill['source'] }> = [];
-
-    // Bundled (lowest priority)
+    // 3. Bundled skills
     if (this.bundledDir) {
       dirs.push({ dir: this.bundledDir, source: 'bundled' });
     }
 
-    // User home
-    const userDir = path.join(os.homedir(), '.phalanx', 'skills');
-    dirs.push({ dir: userDir, source: 'user' });
+    // 2. Managed / global (~/.phalanx/skills)
+    const managedDir = path.join(os.homedir(), '.phalanx', 'skills');
+    dirs.push({ dir: managedDir, source: 'managed' });
 
-    // Extra dirs
-    for (const extra of this.extraDirs) {
-      dirs.push({ dir: extra, source: 'user' });
-    }
-
-    // Workspace (highest priority)
+    // 1. Workspace (highest priority)
     if (this.projectRoot) {
       dirs.push({ dir: path.join(this.projectRoot, 'skills'), source: 'workspace' });
     }
