@@ -1,0 +1,17 @@
+{
+  "dbPath": ".phalanx/phalanx.db",
+  "dashboardPort": 18080,
+  "logPath": ".phalanx/phalanx.log",
+  "llm": {
+    "systemDefault": "anthropic/claude-sonnet-4-5-20250929",
+    "providers": {
+      "anthropic": {
+        "enabled": true,
+        "authMode": "token"
+      }
+    }
+  },
+  "daemon": {
+    "autoStart": true
+  }
+}

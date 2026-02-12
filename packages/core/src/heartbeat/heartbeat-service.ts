@@ -82,7 +82,7 @@ export class HeartbeatService extends EventEmitter<HeartbeatServiceEvents> {
    * Get the current service state (for monitoring).
    */
   getState(): Readonly<Omit<HeartbeatServiceState, 'timer'>> {
-    const { timer: _timer, ...rest } = this.state;
+    const { timer: _unusedTimer, ...rest } = this.state;
     return rest;
   }
 

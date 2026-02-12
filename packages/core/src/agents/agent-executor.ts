@@ -247,6 +247,9 @@ export class AgentExecutor {
     if (config.conventions) {
       sections.push(`# Project Conventions\n\n${config.conventions}`);
     }
+    if (config.skillsContent) {
+      sections.push(config.skillsContent);
+    }
 
     return sections.join('\n\n---\n\n');
   }
