@@ -32,6 +32,8 @@ export default function ChannelPage() {
     setInput('');
     try {
       await apiPost('/channel', { content: text, role: 'user' });
+      // SSE events will trigger refreshMessages automatically,
+      // but also refresh manually to ensure immediate display
       await refreshMessages();
     } finally {
       setSending(false);
@@ -68,7 +70,7 @@ export default function ChannelPage() {
                 >
                   <p className="whitespace-pre-wrap">{msg.content}</p>
                   <span className="mt-1 block text-xs opacity-60">
-                    {new Date(msg.timestamp).toLocaleTimeString()}
+                    {new Date(msg.createdAt).toLocaleTimeString()}
                   </span>
                 </div>
               </div>
@@ -93,7 +95,7 @@ export default function ChannelPage() {
           disabled={sending || !input.trim()}
           className="rounded-md bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
         >
-          Send
+          {sending ? 'Thinking...' : 'Send'}
         </button>
       </div>
     </div>

@@ -20,11 +20,40 @@ vi.mock('@/lib/db', () => ({
     findByRole: vi.fn((role: string) => mockMessages.filter(m => m.role === role)),
     findRecent: vi.fn((limit: number = 50) => mockMessages.slice(-limit).reverse()),
   })),
+  getGoalRepository: vi.fn(() => ({
+    findAll: vi.fn(() => []),
+  })),
+  getAgentRepository: vi.fn(() => ({
+    findAll: vi.fn(() => []),
+  })),
+  getTicketRepository: vi.fn(() => ({
+    findAll: vi.fn(() => []),
+  })),
 }));
 
 vi.mock('@/lib/event-bus', () => ({
   eventBus: { emit: vi.fn() },
 }));
+
+const mockChat = vi.fn().mockResolvedValue({
+  content: 'Team Lead response',
+  usage: { inputTokens: 50, outputTokens: 100 },
+  model: 'mock-model',
+});
+
+vi.mock('@phalanx/core', async (importOriginal) => {
+  const original = await importOriginal<Record<string, unknown>>();
+  return {
+    ...original,
+    AnthropicProvider: vi.fn().mockImplementation(() => ({
+      name: 'anthropic',
+      models: ['mock-model'],
+      chat: mockChat,
+      chatWithTools: vi.fn(),
+      isAvailable: vi.fn().mockResolvedValue(true),
+    })),
+  };
+});
 
 import { GET, POST } from '../channel/route';
 
@@ -48,7 +77,7 @@ describe('POST /api/channel', () => {
     mockMessages.length = 0;
   });
 
-  it('should add a message and return 201', async () => {
+  it('should add a user message and generate team lead response', async () => {
     const req = new Request('http://localhost/api/channel', {
       method: 'POST',
       body: JSON.stringify({ content: 'Hello team' }),
@@ -59,9 +88,12 @@ describe('POST /api/channel', () => {
     const body = await res.json();
 
     expect(res.status).toBe(201);
-    expect(body.content).toBe('Hello team');
-    expect(body.role).toBe('user');
-    expect(body.id).toBeDefined();
+    expect(body.userMessage.content).toBe('Hello team');
+    expect(body.userMessage.role).toBe('user');
+    expect(body.userMessage.id).toBeDefined();
+    // Team Lead LLM response should be generated
+    expect(body.teamLeadMessage).toBeDefined();
+    expect(body.teamLeadMessage.role).toBe('team-lead');
   });
 
   it('should return 400 for empty content', async () => {
@@ -75,7 +107,7 @@ describe('POST /api/channel', () => {
     expect(res.status).toBe(400);
   });
 
-  it('should accept custom role', async () => {
+  it('should accept custom role and skip LLM when role is team-lead', async () => {
     const req = new Request('http://localhost/api/channel', {
       method: 'POST',
       body: JSON.stringify({ content: 'Status update', role: 'team-lead' }),
@@ -85,6 +117,28 @@ describe('POST /api/channel', () => {
     const res = await POST(req);
     const body = await res.json();
 
-    expect(body.role).toBe('team-lead');
+    expect(body.userMessage.role).toBe('team-lead');
+    // No team lead response when the message is from team-lead
+    expect(body.teamLeadMessage).toBeUndefined();
+  });
+
+  it('should call LLM with channel history', async () => {
+    // Pre-populate a message
+    mockMessages.push({
+      id: 'prev-1',
+      role: 'user',
+      content: 'Previous message',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const req = new Request('http://localhost/api/channel', {
+      method: 'POST',
+      body: JSON.stringify({ content: 'New message' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    await POST(req);
+    expect(mockChat).toHaveBeenCalledOnce();
   });
 });

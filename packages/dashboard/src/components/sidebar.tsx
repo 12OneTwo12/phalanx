@@ -10,12 +10,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/', label: 'Overview', icon: '📊' },
+  { href: '/channel', label: 'Channel', icon: '💬' },
   { href: '/goals', label: 'Goals', icon: '🎯' },
   { href: '/tickets', label: 'Tickets', icon: '🎫' },
   { href: '/agents', label: 'Agents', icon: '🤖' },
   { href: '/heartbeat', label: 'Heartbeat', icon: '💓' },
-  { href: '/channel', label: 'Channel', icon: '💬' },
   { href: '/activity', label: 'Activity', icon: '📜' },
   { href: '/conventions', label: 'Conventions', icon: '📐' },
 ];
@@ -30,10 +29,7 @@ export function Sidebar() {
       </div>
       <nav aria-label="Main navigation" className="flex-1 space-y-1 px-2">
         {NAV_ITEMS.map((item) => {
-          const active =
-            item.href === '/'
-              ? pathname === '/'
-              : pathname.startsWith(item.href);
+          const active = pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
