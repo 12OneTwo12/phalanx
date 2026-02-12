@@ -84,6 +84,27 @@ export async function validateOllamaConnection(baseUrl: string): Promise<Validat
   }
 }
 
+// ---------------------------------------------------------------------------
+// Format validators (no network calls)
+// ---------------------------------------------------------------------------
+
+const SETUP_TOKEN_PREFIX = 'sk-ant-oat01-';
+const SETUP_TOKEN_MIN_LENGTH = 80;
+
+/**
+ * Validate Anthropic setup-token format (prefix + minimum length).
+ * No network call — use validateAnthropicKey() for full validation.
+ */
+export function validateSetupTokenFormat(token: string): ValidationResult {
+  if (!token.startsWith(SETUP_TOKEN_PREFIX)) {
+    return { valid: false, error: `Token must start with "${SETUP_TOKEN_PREFIX}"` };
+  }
+  if (token.length < SETUP_TOKEN_MIN_LENGTH) {
+    return { valid: false, error: `Token too short (minimum ${SETUP_TOKEN_MIN_LENGTH} characters)` };
+  }
+  return { valid: true };
+}
+
 /** Map of provider name → env var name for API keys */
 export const PROVIDER_ENV_VARS: Record<string, string> = {
   anthropic: 'ANTHROPIC_API_KEY',

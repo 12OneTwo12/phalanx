@@ -3,6 +3,7 @@
  */
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import type { ProviderAuthMode } from '@phalanx/core';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -13,6 +14,8 @@ export interface LLMProviderEntry {
   defaultModel?: string;
   /** Base URL override (primarily for Ollama) */
   baseUrl?: string;
+  /** Authentication mode used for this provider */
+  authMode?: ProviderAuthMode;
 }
 
 export interface PhalanxConfig {

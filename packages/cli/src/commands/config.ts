@@ -6,6 +6,7 @@ import { logger } from '../utils/logger.js';
 import { loadConfig } from '../utils/config-loader.js';
 import { runSetupWizard } from '../wizard/setup-wizard.js';
 import { PROVIDER_ENV_VARS } from '../wizard/provider-validator.js';
+import { getCredentialSummary } from '../utils/credential-store.js';
 
 export const configCommand = new Command('config')
   .description('View or update Phalanx configuration')
@@ -53,10 +54,24 @@ configCommand
     } else {
       for (const [name, entry] of Object.entries(providers)) {
         const status = entry.enabled ? 'enabled' : 'disabled';
+
+        // Determine auth info
+        const credSummary = getCredentialSummary(name);
         const envVar = PROVIDER_ENV_VARS[name];
-        const hasKey = envVar ? !!process.env[envVar] : false;
-        const keyStatus = hasKey ? 'key set' : 'key missing';
-        logger.kv(`  ${name}`, `${status} (${keyStatus})`);
+        const hasEnvKey = envVar ? !!process.env[envVar] : false;
+
+        let authInfo: string;
+        if (credSummary) {
+          authInfo = `${credSummary.authMode} (${credSummary.masked})`;
+        } else if (hasEnvKey) {
+          authInfo = 'api-key (env)';
+        } else if (entry.authMode === 'none') {
+          authInfo = 'none';
+        } else {
+          authInfo = 'no credentials';
+        }
+
+        logger.kv(`  ${name}`, `${status} | auth: ${authInfo}`);
         if (entry.defaultModel) {
           logger.dim(`    model: ${entry.defaultModel}`);
         }

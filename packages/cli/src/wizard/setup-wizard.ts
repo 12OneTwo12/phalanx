@@ -1,12 +1,14 @@
 /**
  * Interactive setup wizard for Phalanx LLM provider configuration.
  * Uses @clack/prompts for a polished TUI experience.
+ * Step 2 uses AuthStrategy pattern for pluggable auth methods.
  */
 import * as p from '@clack/prompts';
 import { MODEL_CATALOG } from '@phalanx/core';
 import type { PhalanxConfig, LLMProviderEntry } from '../utils/config-loader.js';
 import { saveConfig } from '../utils/config-loader.js';
-import { PROVIDER_VALIDATORS, type ValidationResult } from './provider-validator.js';
+import { PROVIDER_VALIDATORS } from './provider-validator.js';
+import { getProviderAuthStrategies, authenticateProvider } from './auth-strategy.js';
 
 // ---------------------------------------------------------------------------
 // Provider metadata
@@ -16,15 +18,15 @@ interface ProviderInfo {
   value: string;
   label: string;
   hint: string;
-  envVar: string;
-  needsApiKey: boolean;
+  /** True for Ollama — no auth required */
+  noAuth: boolean;
 }
 
 const PROVIDERS: ProviderInfo[] = [
-  { value: 'anthropic', label: 'Anthropic (Claude)', hint: 'ANTHROPIC_API_KEY', envVar: 'ANTHROPIC_API_KEY', needsApiKey: true },
-  { value: 'openai', label: 'OpenAI (GPT)', hint: 'OPENAI_API_KEY', envVar: 'OPENAI_API_KEY', needsApiKey: true },
-  { value: 'gemini', label: 'Google Gemini', hint: 'GOOGLE_API_KEY', envVar: 'GOOGLE_API_KEY', needsApiKey: true },
-  { value: 'ollama', label: 'Ollama (local)', hint: 'No API key needed', envVar: 'OLLAMA_BASE_URL', needsApiKey: false },
+  { value: 'anthropic', label: 'Anthropic (Claude)', hint: 'API key or Claude Code Plan', noAuth: false },
+  { value: 'openai', label: 'OpenAI (GPT)', hint: 'API key or Codex subscription', noAuth: false },
+  { value: 'gemini', label: 'Google Gemini', hint: 'GOOGLE_API_KEY', noAuth: false },
+  { value: 'ollama', label: 'Ollama (local)', hint: 'No API key needed', noAuth: true },
 ];
 
 // ---------------------------------------------------------------------------
@@ -60,33 +62,38 @@ export async function runSetupWizard(config: PhalanxConfig): Promise<WizardResul
     return null;
   }
 
-  // Step 2: API key verification per provider
+  // Step 2: Authentication per provider (strategy-based)
   const providerEntries: Record<string, LLMProviderEntry> = {};
 
   for (const providerName of selectedProviders) {
     const info = PROVIDERS.find((pr) => pr.value === providerName)!;
     const entry: LLMProviderEntry = { enabled: true };
 
-    if (info.needsApiKey) {
-      const result = await verifyApiKey(providerName, info);
-      if (result === null) {
-        p.cancel('Setup cancelled.');
-        return null;
-      }
-      if (!result.valid) {
-        entry.enabled = false;
-        p.log.warn(`${info.label}: skipped (key not validated)`);
-      }
-    } else {
-      // Ollama — verify connection
+    if (info.noAuth) {
+      // Ollama — verify connection (no auth needed)
       const ollamaResult = await verifyOllama();
       if (ollamaResult === null) {
         p.cancel('Setup cancelled.');
         return null;
       }
       entry.baseUrl = ollamaResult.baseUrl;
+      entry.authMode = 'none';
       if (!ollamaResult.connected) {
         p.log.warn('Ollama: not reachable (will retry at runtime)');
+      }
+    } else {
+      // Use auth strategies
+      const strategies = getProviderAuthStrategies(providerName);
+      const authResult = await authenticateProvider(providerName, info.label, strategies);
+      if (authResult === null) {
+        p.cancel('Setup cancelled.');
+        return null;
+      }
+      if (!authResult.valid) {
+        entry.enabled = false;
+        p.log.warn(`${info.label}: skipped (not validated)`);
+      } else {
+        entry.authMode = authResult.authMode;
       }
     }
 
@@ -154,67 +161,6 @@ export async function runSetupWizard(config: PhalanxConfig): Promise<WizardResul
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-async function verifyApiKey(
-  providerName: string,
-  info: ProviderInfo,
-): Promise<ValidationResult | null> {
-  const envValue = process.env[info.envVar];
-
-  if (envValue) {
-    // Key exists in env — validate it
-    const s = p.spinner();
-    s.start(`Validating ${info.label} key...`);
-    const result = await PROVIDER_VALIDATORS[providerName](envValue);
-    if (result.valid) {
-      s.stop(`${info.label}: validated`);
-    } else {
-      s.stop(`${info.label}: validation failed (${result.error})`);
-    }
-    return result;
-  }
-
-  // Key not in env — prompt user
-  p.log.warn(`${info.envVar} not found in environment.`);
-
-  const action = await p.select({
-    message: `How do you want to configure ${info.label}?`,
-    options: [
-      { value: 'enter' as const, label: 'Enter API key now', hint: 'will validate immediately' },
-      { value: 'skip' as const, label: 'Skip for now', hint: `set ${info.envVar} later` },
-    ],
-  });
-
-  if (p.isCancel(action)) return null;
-
-  if (action === 'skip') {
-    return { valid: false, error: 'skipped' };
-  }
-
-  const apiKey = await p.text({
-    message: `Enter your ${info.label} API key:`,
-    placeholder: info.envVar,
-    validate: (val) => {
-      if (!val?.trim()) return 'API key cannot be empty';
-      return undefined;
-    },
-  });
-
-  if (p.isCancel(apiKey)) return null;
-
-  const s = p.spinner();
-  s.start(`Validating ${info.label} key...`);
-  const result = await PROVIDER_VALIDATORS[providerName](apiKey.trim());
-
-  if (result.valid) {
-    s.stop(`${info.label}: validated`);
-    p.log.info(`Add to your shell profile:\n  export ${info.envVar}="${apiKey.trim()}"`);
-  } else {
-    s.stop(`${info.label}: validation failed (${result.error})`);
-  }
-
-  return result;
-}
-
 async function verifyOllama(): Promise<{ baseUrl: string; connected: boolean } | null> {
   const baseUrl = await p.text({
     message: 'Ollama base URL:',
@@ -252,7 +198,8 @@ function writeAndFinish(config: PhalanxConfig, result: WizardResult): void {
   lines.push(`Default model: ${result.systemDefault}`);
   for (const [name, entry] of Object.entries(result.providers)) {
     const status = entry.enabled ? 'enabled' : 'disabled';
-    lines.push(`${name}: ${status}`);
+    const auth = entry.authMode ? ` (${entry.authMode})` : '';
+    lines.push(`${name}: ${status}${auth}`);
   }
   lines.push(`Auto-start: ${result.autoStart ? 'yes' : 'no'}`);
 
