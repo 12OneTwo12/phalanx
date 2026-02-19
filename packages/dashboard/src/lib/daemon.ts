@@ -65,9 +65,12 @@ import {
   getDebateRepository,
   getDebateArgumentRepository,
   getExecutionTraceRepository,
+  getProviderConfigRepository,
 } from './db';
+import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { eventBus } from './event-bus';
 import { getLLMProvider } from './llm-provider';
 import { findProjectRoot } from './convention-sync';
@@ -133,10 +136,94 @@ function loadTeamModeConfig(): TeamModeConfig {
     return {
       mode: (tm.mode as TeamModeConfig['mode']) ?? 'lean',
       smartThreshold: (tm.smartThreshold as string) ?? 'high',
-      agentsPerRole: (tm.agentsPerRole as number) ?? 2,
+      agentsPerRole: (tm.agentsPerRole as number) ?? 3,
     };
   } catch {
     return { mode: 'lean', smartThreshold: 'high', agentsPerRole: 2 };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-register active providers in DB
+// ---------------------------------------------------------------------------
+
+/**
+ * Ensure active LLM providers (from credentials + env vars) are registered
+ * in the provider_configs table so the Settings page can display them.
+ */
+function syncProvidersToDb(): void {
+  try {
+    const providerConfigRepo = getProviderConfigRepository();
+    const existing = providerConfigRepo.findAll();
+    const existingTypes = new Set(existing.map((p) => p.type));
+
+    // Check credential store
+    const credFile = resolve(homedir(), '.phalanx', 'credentials.json');
+    const credentials: Record<string, { secret: string; authMode?: string }> = {};
+    if (existsSync(credFile)) {
+      try {
+        Object.assign(credentials, JSON.parse(readFileSync(credFile, 'utf-8')));
+      } catch { /* ignore parse errors */ }
+    }
+
+    // Check env vars
+    const envKeyMap: Record<string, string> = {
+      anthropic: 'ANTHROPIC_API_KEY',
+      openai: 'OPENAI_API_KEY',
+      gemini: 'GOOGLE_API_KEY',
+    };
+
+    const providerNames: Record<string, string> = {
+      anthropic: 'Anthropic',
+      openai: 'OpenAI',
+      gemini: 'Google Gemini',
+      ollama: 'Ollama',
+    };
+
+    const defaultModels: Record<string, string> = {
+      anthropic: 'claude-sonnet-4-5-20250929',
+      openai: 'gpt-4o',
+      gemini: 'gemini-2.0-flash',
+    };
+
+    // Register providers from credential store
+    for (const providerType of Object.keys(credentials)) {
+      if (!existingTypes.has(providerType as 'anthropic' | 'openai' | 'ollama' | 'gemini' | 'custom')) continue;
+      // Already registered — skip
+    }
+
+    // Register providers that have credentials but aren't in DB
+    for (const providerType of Object.keys(credentials)) {
+      const typedType = providerType as 'anthropic' | 'openai' | 'ollama' | 'gemini' | 'custom';
+      if (existingTypes.has(typedType)) continue;
+      providerConfigRepo.create({
+        id: randomUUID(),
+        type: typedType,
+        name: providerNames[providerType] ?? providerType,
+        enabled: true,
+        defaultModel: defaultModels[providerType] ?? null,
+      });
+      existingTypes.add(typedType);
+      console.log(`[phalanx] Auto-registered provider: ${providerType}`);
+    }
+
+    // Register providers from env vars
+    for (const [providerType, envVar] of Object.entries(envKeyMap)) {
+      const typedType = providerType as 'anthropic' | 'openai' | 'ollama' | 'gemini' | 'custom';
+      if (existingTypes.has(typedType)) continue;
+      if (!process.env[envVar]) continue;
+      providerConfigRepo.create({
+        id: randomUUID(),
+        type: typedType,
+        name: providerNames[providerType] ?? providerType,
+        enabled: true,
+        defaultModel: defaultModels[providerType] ?? null,
+      });
+      existingTypes.add(typedType);
+      console.log(`[phalanx] Auto-registered provider from env: ${providerType}`);
+    }
+  } catch (err) {
+    console.warn('[phalanx] Failed to sync providers to DB:', err);
   }
 }
 
@@ -167,6 +254,9 @@ function createDaemonWiring(): DaemonState {
     );
   }
   const { provider: llmProvider } = llmResult;
+
+  // Auto-register active providers in DB so Settings page can show them
+  syncProvidersToDb();
 
   // Provider registry for model selector
   const { registry: providerRegistry } = createLLMStack();
@@ -280,6 +370,7 @@ function createDaemonWiring(): DaemonState {
     agentConfigurator,
     modelSelector,
     llmProvider,
+    { maxAgentsPerRole: teamModeConfig.agentsPerRole },
   );
 
   // Heartbeat service

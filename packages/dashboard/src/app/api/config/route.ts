@@ -30,7 +30,7 @@ export async function GET() {
   return jsonResponse({
     approval: daemon.approval ?? { mode: 'manual' },
     pr: daemon.pr ?? { mode: 'manual' },
-    teamMode: daemon.teamMode ?? { mode: 'lean', smartThreshold: 'high', agentsPerRole: 2 },
+    teamMode: daemon.teamMode ?? { mode: 'lean', smartThreshold: 'high', agentsPerRole: 3 },
   });
 }
 
@@ -67,6 +67,6 @@ export async function PATCH(request: Request) {
   return jsonResponse({
     approval: daemon.approval ?? { mode: 'manual' },
     pr: daemon.pr ?? { mode: 'manual' },
-    teamMode: daemon.teamMode ?? { mode: 'lean', smartThreshold: 'high', agentsPerRole: 2 },
+    teamMode: daemon.teamMode ?? { mode: 'lean', smartThreshold: 'high', agentsPerRole: 3 },
   });
 }

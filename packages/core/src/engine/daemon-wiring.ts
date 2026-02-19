@@ -295,9 +295,10 @@ export class DaemonWiring {
     if (this.started) return;
     this.started = true;
 
-    // Reclaim stale agents from previous crashes before scheduling
+    // Recover stuck state from previous crashes before scheduling
     if (this.deps.smartAssignment) {
       this.deps.smartAssignment.reclaimStaleAgents();
+      this.deps.smartAssignment.recoverFailedTickets();
     }
 
     this.deps.heartbeatService.start();

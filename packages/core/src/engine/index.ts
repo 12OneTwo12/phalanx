@@ -40,6 +40,7 @@ export { AgentConfigurator } from './agent-configurator.js';
 export {
   SmartAssignmentService,
   type AssignmentResult,
+  type SmartAssignmentConfig,
 } from './smart-assignment-service.js';
 export { CompletionHandler } from './completion-handler.js';
 export { DaemonWiring, type DaemonDeps } from './daemon-wiring.js';

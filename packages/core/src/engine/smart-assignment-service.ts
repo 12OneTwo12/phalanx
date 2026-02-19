@@ -23,8 +23,13 @@ import { type ModelSelector, type TicketAnalysis } from './model-selector.js';
 // Types
 // ---------------------------------------------------------------------------
 
-/** Maximum number of agents per role to prevent unbounded creation */
-const MAX_AGENTS_PER_ROLE = 5;
+/** Default cap — overridden by constructor config */
+const DEFAULT_MAX_AGENTS_PER_ROLE = 3;
+
+export interface SmartAssignmentConfig {
+  /** Maximum agents per role (default: 3) */
+  maxAgentsPerRole?: number;
+}
 
 export interface AssignmentResult {
   agentId: string;
@@ -47,6 +52,8 @@ const TicketAnalysisSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export class SmartAssignmentService {
+  private readonly maxAgentsPerRole: number;
+
   constructor(
     private readonly agentRepo: AgentRepository,
     private readonly ticketRepo: TicketRepository,
@@ -54,25 +61,75 @@ export class SmartAssignmentService {
     private readonly agentConfigurator: AgentConfigurator,
     private readonly modelSelector: ModelSelector,
     private readonly llmProvider: LLMProvider,
-  ) {}
+    config?: SmartAssignmentConfig,
+  ) {
+    this.maxAgentsPerRole = config?.maxAgentsPerRole ?? DEFAULT_MAX_AGENTS_PER_ROLE;
+  }
 
   /**
-   * Reclaim stale agents: agents stuck in "running" but with no active ticket.
-   * Should be called on daemon startup to clean up from previous crashes.
+   * Reclaim stale agents on daemon startup.
+   * Handles two cases:
+   * 1. Running agents with no currentTicketId (crash during execution)
+   * 2. Running agents whose ticket is in a terminal state (failed/done/escalated)
+   *    — this happens when the daemon restarts mid-retry
    */
   reclaimStaleAgents(): number {
+    const TERMINAL_STATUSES = new Set(['failed', 'done', 'escalated']);
     const running = this.agentRepo.findByStatus('running');
     let reclaimed = 0;
+
     for (const agent of running) {
+      let shouldReclaim = false;
+
       if (!agent.currentTicketId) {
+        shouldReclaim = true;
+      } else {
+        const ticket = this.ticketRepo.findById(agent.currentTicketId);
+        if (!ticket || TERMINAL_STATUSES.has(ticket.status)) {
+          shouldReclaim = true;
+        }
+      }
+
+      if (shouldReclaim) {
         this.agentRepo.update(agent.id, { status: 'idle', currentTicketId: null });
         reclaimed++;
       }
     }
+
     if (reclaimed > 0) {
       console.log(`[phalanx] Reclaimed ${reclaimed} stale agent(s) → idle`);
     }
     return reclaimed;
+  }
+
+  /**
+   * Recover stuck failed tickets on daemon startup.
+   * - retryCount < maxRetries → reset to backlog for reassignment
+   * - retryCount >= maxRetries → escalate
+   */
+  recoverFailedTickets(maxRetries = 3): number {
+    const failed = this.ticketRepo.findByStatus('failed');
+    let recovered = 0;
+
+    for (const ticket of failed) {
+      if (ticket.retryCount < maxRetries) {
+        // Reset to backlog — will be reassigned on next tick
+        this.ticketRepo.update(ticket.id, {
+          status: 'backlog',
+          assignedAgentId: null,
+          retryCount: ticket.retryCount + 1,
+        });
+      } else {
+        // Max retries exceeded — escalate
+        this.ticketRepo.update(ticket.id, { status: 'escalated' });
+      }
+      recovered++;
+    }
+
+    if (recovered > 0) {
+      console.log(`[phalanx] Recovered ${recovered} failed ticket(s) on startup`);
+    }
+    return recovered;
   }
 
   /**
@@ -96,8 +153,16 @@ export class SmartAssignmentService {
       return { agentId: ticket.assignedAgentId, isNewAgent: false, selectedModel, reasoning: 'Already assigned' };
     }
 
-    // Step 1: Analyze ticket
-    const analysis = await this.analyzeTicket(ticket.title, ticket.description, ticket.priority);
+    // Step 1: Analyze ticket (use cached analysis from metadata if available)
+    let analysis: TicketAnalysis;
+    const cachedAnalysis = this.getCachedAnalysis(ticket.metadata);
+    if (cachedAnalysis) {
+      analysis = cachedAnalysis;
+    } else {
+      analysis = await this.analyzeTicket(ticket.title, ticket.description, ticket.priority);
+      // Cache analysis in ticket metadata to avoid re-analyzing on next tick
+      this.cacheAnalysis(ticketId, ticket.metadata, analysis);
+    }
 
     // Step 2: Select model based on complexity
     const selectedModel = this.modelSelector.select(analysis);
@@ -128,7 +193,7 @@ export class SmartAssignmentService {
       } else {
         // 3c. Check agent cap before creating new
         const totalForRole = this.agentRepo.findByRole(role).length;
-        if (totalForRole >= MAX_AGENTS_PER_ROLE) {
+        if (totalForRole >= this.maxAgentsPerRole) {
           // At cap — skip this tick, will retry when an agent becomes idle
           return null;
         }
@@ -252,5 +317,26 @@ export class SmartAssignmentService {
       domain: 'general',
       specializations: [],
     };
+  }
+
+  /** Retrieve cached ticket analysis from ticket metadata (avoids redundant LLM calls). */
+  private getCachedAnalysis(metadata: string | null): TicketAnalysis | null {
+    if (!metadata) return null;
+    try {
+      const parsed = JSON.parse(metadata) as Record<string, unknown>;
+      const cached = parsed._cachedAnalysis as TicketAnalysis | undefined;
+      if (cached?.requiredRole && cached?.complexity) return cached;
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  /** Store analysis result in ticket metadata for future ticks. */
+  private cacheAnalysis(ticketId: string, existingMetadata: string | null, analysis: TicketAnalysis): void {
+    try {
+      let meta: Record<string, unknown> = {};
+      if (existingMetadata) meta = JSON.parse(existingMetadata) as Record<string, unknown>;
+      meta._cachedAnalysis = analysis;
+      this.ticketRepo.update(ticketId, { metadata: JSON.stringify(meta) });
+    } catch { /* non-fatal */ }
   }
 }

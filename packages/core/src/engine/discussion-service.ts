@@ -216,10 +216,12 @@ export class DiscussionService {
   async discuss(request: DiscussionRequest): Promise<DiscussionResult> {
     const maxParticipants = request.maxParticipants ?? 3;
 
-    // 1. Start debate record
+    // 1. Start debate record — use the requesting agent's role as the discussion group
+    const requestingAgent = this.deps.agentRepo.findById(request.requestingAgentId);
+    const roleGroup = requestingAgent?.role ?? 'backend';
     const debate = this.deps.debateOrchestrator.startDebate(
       request.topic,
-      'discussion',
+      roleGroup,
       request.requestingAgentId,
     );
 

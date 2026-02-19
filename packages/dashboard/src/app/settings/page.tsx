@@ -613,6 +613,7 @@ const TEAM_MODE_DESCRIPTIONS: Record<string, string> = {
 function TeamModeSection({ config, onSave }: { config: DaemonConfig | undefined; onSave: () => void }) {
   const currentMode = config?.teamMode?.mode ?? 'lean';
   const threshold = config?.teamMode?.smartThreshold ?? 'high';
+  const agentsPerRole = config?.teamMode?.agentsPerRole ?? 3;
   const [saving, setSaving] = useState(false);
 
   const handleModeChange = async (mode: string) => {
@@ -629,6 +630,16 @@ function TeamModeSection({ config, onSave }: { config: DaemonConfig | undefined;
     setSaving(true);
     try {
       await apiPatch('/config', { teamMode: { mode: 'smart', smartThreshold } });
+      onSave();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAgentsPerRoleChange = async (value: number) => {
+    setSaving(true);
+    try {
+      await apiPatch('/config', { teamMode: { agentsPerRole: value } });
       onSave();
     } finally {
       setSaving(false);
@@ -671,6 +682,29 @@ function TeamModeSection({ config, onSave }: { config: DaemonConfig | undefined;
             </select>
           </div>
         )}
+
+        <div className="mt-4 border-t border-gray-700 pt-4">
+          <label className="mb-1 block text-xs text-gray-400">
+            Max Agents per Role: <span className="font-bold text-gray-200">{agentsPerRole}</span>
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={1}
+              max={5}
+              value={agentsPerRole}
+              onChange={(e) => handleAgentsPerRoleChange(Number(e.target.value))}
+              disabled={saving}
+              className="h-2 w-48 cursor-pointer appearance-none rounded-lg bg-gray-700 accent-blue-500"
+            />
+            <span className="text-xs text-gray-500">
+              {agentsPerRole === 1 ? '1 agent (minimal)' : `Up to ${agentsPerRole} agents per role`}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-gray-600">
+            Limits how many agents can be created for each role (backend, frontend, qa, etc). Tickets queue when at capacity.
+          </p>
+        </div>
 
         <p className="mt-2 text-xs text-gray-500">
           {TEAM_MODE_DESCRIPTIONS[currentMode] ?? ''}
