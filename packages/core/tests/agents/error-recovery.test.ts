@@ -7,8 +7,8 @@ import {
 } from '../../src/agents/error-recovery.js';
 
 describe('MAX_CONSECUTIVE_TOOL_ERRORS', () => {
-  it('is 3', () => {
-    expect(MAX_CONSECUTIVE_TOOL_ERRORS).toBe(3);
+  it('is 5', () => {
+    expect(MAX_CONSECUTIVE_TOOL_ERRORS).toBe(5);
   });
 });
 
@@ -64,18 +64,20 @@ describe('isRetryableError', () => {
 });
 
 describe('shouldEscalate', () => {
-  it('returns false for 0, 1, 2 consecutive errors', () => {
+  it('returns false below MAX_CONSECUTIVE_TOOL_ERRORS', () => {
     expect(shouldEscalate(0)).toBe(false);
     expect(shouldEscalate(1)).toBe(false);
     expect(shouldEscalate(2)).toBe(false);
+    expect(shouldEscalate(3)).toBe(false);
+    expect(shouldEscalate(4)).toBe(false);
   });
 
-  it('returns true at MAX_CONSECUTIVE_TOOL_ERRORS (3)', () => {
-    expect(shouldEscalate(3)).toBe(true);
+  it('returns true at MAX_CONSECUTIVE_TOOL_ERRORS (5)', () => {
+    expect(shouldEscalate(5)).toBe(true);
   });
 
   it('returns true above MAX_CONSECUTIVE_TOOL_ERRORS', () => {
-    expect(shouldEscalate(4)).toBe(true);
+    expect(shouldEscalate(6)).toBe(true);
     expect(shouldEscalate(10)).toBe(true);
     expect(shouldEscalate(100)).toBe(true);
   });

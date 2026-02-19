@@ -264,7 +264,7 @@ describe('AgentExecutor', () => {
   });
 
   describe('consecutive tool errors', () => {
-    it('escalates after consecutive tool errors (3)', async () => {
+    it('escalates after consecutive tool errors (5)', async () => {
       const failingTool = makeTool(
         'failing',
         { input: z.string() },
@@ -286,13 +286,21 @@ describe('AgentExecutor', () => {
           stopReason: 'tool_use',
           toolCalls: [{ id: 'tc-3', name: 'failing', input: { input: 'c' } }],
         }),
+        makeToolCallResult({
+          stopReason: 'tool_use',
+          toolCalls: [{ id: 'tc-4', name: 'failing', input: { input: 'd' } }],
+        }),
+        makeToolCallResult({
+          stopReason: 'tool_use',
+          toolCalls: [{ id: 'tc-5', name: 'failing', input: { input: 'e' } }],
+        }),
       ]);
 
       const executor = new AgentExecutor(provider, registry);
       const result = await executor.run(makeConfig(), 'Use the failing tool');
 
       expect(result.status).toBe('escalated');
-      expect(result.finalContent).toContain('3 times consecutively');
+      expect(result.finalContent).toContain('5 times consecutively');
     });
 
     it('resets consecutive error counter on successful tool call', async () => {

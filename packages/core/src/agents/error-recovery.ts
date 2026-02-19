@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 /** Maximum consecutive tool errors before escalation */
-export const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
+export const MAX_CONSECUTIVE_TOOL_ERRORS = 5;
 
 /** Patterns indicating a transient (retryable) error */
 const RETRYABLE_PATTERNS = [

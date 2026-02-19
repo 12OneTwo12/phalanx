@@ -180,7 +180,7 @@ export class AgentTicketExecutor implements TicketExecutor {
     const soul = await this.soulLoader.load(resolved.role);
 
     return {
-      id: `ticket-${ticket.id}`,
+      id: ticket.assignedAgentId ?? `ticket-${ticket.id}`,
       role: resolved.role,
       soul,
       model: resolved.model,
