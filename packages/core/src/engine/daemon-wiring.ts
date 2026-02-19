@@ -28,6 +28,8 @@ import type { ProposalRepository } from '../db/repositories/proposal.repository.
 import type { TicketRepository } from '../db/repositories/ticket.repository.js';
 import type { AutoCommenter } from './auto-commenter.js';
 import type { WorkLogRecorder } from './work-log-recorder.js';
+import type { MeetingOrchestrator } from './meeting-orchestrator.js';
+import type { DebateOrchestrator } from './debate-orchestrator.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,6 +52,10 @@ export interface DaemonDeps {
   workLogRecorder?: WorkLogRecorder;
   /** Optional SSE event emitter for dashboard integration */
   eventBus?: { emit(type: string, payload?: Record<string, unknown>): void };
+  /** Optional meeting orchestrator for team meetings */
+  meetingOrchestrator?: MeetingOrchestrator;
+  /** Optional debate orchestrator for intra-role debates */
+  debateOrchestrator?: DebateOrchestrator;
 }
 
 // ---------------------------------------------------------------------------
@@ -218,6 +224,34 @@ export class DaemonWiring {
       });
       this.on(completionHandler, 'goal:progressUpdated', (data: { goalId: string; progress: number }) => {
         eventBus.emit('goal:progress', { goalId: data.goalId, progress: data.progress });
+      });
+    }
+
+    // 10. Meeting/Debate events → SSE
+    const { meetingOrchestrator, debateOrchestrator } = this.deps;
+    if (meetingOrchestrator && eventBus) {
+      this.on(meetingOrchestrator, 'meeting:scheduled', (data: { meetingId: string; title: string; type: string }) => {
+        eventBus.emit('meeting:scheduled', data);
+      });
+      this.on(meetingOrchestrator, 'meeting:started', (data: { meetingId: string }) => {
+        eventBus.emit('meeting:started', data);
+      });
+      this.on(meetingOrchestrator, 'meeting:contribution', (data: { meetingId: string; agentId: string }) => {
+        eventBus.emit('meeting:contribution', data);
+      });
+      this.on(meetingOrchestrator, 'meeting:completed', (data: { meetingId: string; summary: string }) => {
+        eventBus.emit('meeting:completed', data);
+      });
+    }
+    if (debateOrchestrator && eventBus) {
+      this.on(debateOrchestrator, 'debate:started', (data: { debateId: string; topic: string; roleGroup: string }) => {
+        eventBus.emit('debate:started', data);
+      });
+      this.on(debateOrchestrator, 'debate:argument', (data: { debateId: string; agentId: string; round: number }) => {
+        eventBus.emit('debate:argument', data);
+      });
+      this.on(debateOrchestrator, 'debate:concluded', (data: { debateId: string; conclusion: string }) => {
+        eventBus.emit('debate:concluded', data);
       });
     }
   }

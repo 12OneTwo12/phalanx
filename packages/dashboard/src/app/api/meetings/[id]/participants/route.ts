@@ -1,5 +1,6 @@
 import { getMeetingParticipantRepository } from '@/lib/db';
-import { jsonResponse, errorResponse, newId, parseBody } from '@/lib/api-utils';
+import { getMeetingOrchestrator } from '@/lib/daemon';
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-utils';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,13 +19,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!body?.agentId || !body?.role) {
     return errorResponse('agentId and role are required');
   }
-  const repo = getMeetingParticipantRepository();
-  const participant = repo.create({
-    id: newId(),
-    meetingId: id,
-    agentId: body.agentId,
-    role: body.role,
-    contributions: body.contributions ?? null,
-  });
-  return jsonResponse(participant, 201);
+  const orchestrator = getMeetingOrchestrator();
+  try {
+    const participant = orchestrator.addContribution(id, body.agentId, body.role, body.contributions ?? '');
+    return jsonResponse(participant, 201);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return errorResponse(msg, 400);
+  }
 }

@@ -1,6 +1,7 @@
 import type { Debate } from '@phalanx/core';
 import { getDebateRepository } from '@/lib/db';
-import { jsonResponse, errorResponse, newId, parseBody } from '@/lib/api-utils';
+import { getDebateOrchestrator } from '@/lib/daemon';
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-utils';
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -24,13 +25,7 @@ export async function POST(req: Request) {
   if (!body?.topic || !body?.roleGroup) {
     return errorResponse('topic and roleGroup are required');
   }
-  const repo = getDebateRepository();
-  const debate = repo.create({
-    id: newId(),
-    topic: body.topic,
-    roleGroup: body.roleGroup,
-    status: 'active',
-    initiatorId: body.initiatorId ?? null,
-  });
+  const orchestrator = getDebateOrchestrator();
+  const debate = orchestrator.startDebate(body.topic, body.roleGroup, body.initiatorId);
   return jsonResponse(debate, 201);
 }

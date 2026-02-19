@@ -1,6 +1,7 @@
 import type { Meeting } from '@phalanx/core';
 import { getMeetingRepository } from '@/lib/db';
-import { jsonResponse, errorResponse, newId, parseBody } from '@/lib/api-utils';
+import { getMeetingOrchestrator } from '@/lib/daemon';
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-utils';
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -29,14 +30,12 @@ export async function POST(req: Request) {
   if (!body?.title || !body?.type) {
     return errorResponse('title and type are required');
   }
-  const repo = getMeetingRepository();
-  const meeting = repo.create({
-    id: newId(),
+  const orchestrator = getMeetingOrchestrator();
+  const meeting = orchestrator.scheduleMeeting({
     title: body.title,
     type: body.type,
-    status: 'scheduled',
-    facilitatorId: body.facilitatorId ?? null,
-    agenda: body.agenda ?? null,
+    facilitatorId: body.facilitatorId,
+    agenda: body.agenda,
   });
   return jsonResponse(meeting, 201);
 }

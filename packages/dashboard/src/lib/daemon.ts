@@ -38,6 +38,8 @@ import {
   createTicketReadCommentsTool,
   createMemoryReadTool,
   createMemoryWriteTool,
+  MeetingOrchestrator,
+  DebateOrchestrator,
 } from '@phalanx/core';
 import * as fs from 'node:fs/promises';
 import {
@@ -52,6 +54,10 @@ import {
   getReverseProposalRepository,
   getTicketCommentRepository,
   getWorkLogRepository,
+  getMeetingRepository,
+  getMeetingParticipantRepository,
+  getDebateRepository,
+  getDebateArgumentRepository,
 } from './db';
 import { eventBus } from './event-bus';
 import { getLLMProvider } from './llm-provider';
@@ -64,6 +70,8 @@ import { findProjectRoot } from './convention-sync';
 interface DaemonState {
   wiring: DaemonWiring;
   started: boolean;
+  meetingOrchestrator: InstanceType<typeof MeetingOrchestrator>;
+  debateOrchestrator: InstanceType<typeof DebateOrchestrator>;
 }
 
 declare global {
@@ -240,6 +248,16 @@ function createDaemonWiring(): DaemonState {
   const autoCommenter = new AutoCommenter(getTicketCommentRepository());
   const workLogRecorder = new WorkLogRecorder(getWorkLogRepository());
 
+  // Meeting & Debate orchestrators
+  const meetingOrchestrator = new MeetingOrchestrator({
+    meetingRepo: getMeetingRepository(),
+    participantRepo: getMeetingParticipantRepository(),
+  });
+  const debateOrchestrator = new DebateOrchestrator({
+    debateRepo: getDebateRepository(),
+    debateArgRepo: getDebateArgumentRepository(),
+  });
+
   // Wire everything together
   const deps: DaemonDeps = {
     heartbeatService,
@@ -254,13 +272,15 @@ function createDaemonWiring(): DaemonState {
     ticketRepo,
     autoCommenter,
     workLogRecorder,
+    meetingOrchestrator,
+    debateOrchestrator,
     eventBus,
   };
 
   const wiring = new DaemonWiring(deps);
   wiring.wire();
 
-  return { wiring, started: false };
+  return { wiring, started: false, meetingOrchestrator, debateOrchestrator };
 }
 
 // ---------------------------------------------------------------------------
@@ -315,4 +335,20 @@ export async function stopDaemon(): Promise<void> {
  */
 export function isDaemonRunning(): boolean {
   return globalThis.__phalanx_daemon__?.started ?? false;
+}
+
+/**
+ * Get the MeetingOrchestrator instance (creates daemon if needed).
+ */
+export function getMeetingOrchestrator(): InstanceType<typeof MeetingOrchestrator> {
+  const state = globalThis.__phalanx_daemon__ ?? (globalThis.__phalanx_daemon__ = createDaemonWiring());
+  return state.meetingOrchestrator;
+}
+
+/**
+ * Get the DebateOrchestrator instance (creates daemon if needed).
+ */
+export function getDebateOrchestrator(): InstanceType<typeof DebateOrchestrator> {
+  const state = globalThis.__phalanx_daemon__ ?? (globalThis.__phalanx_daemon__ = createDaemonWiring());
+  return state.debateOrchestrator;
 }

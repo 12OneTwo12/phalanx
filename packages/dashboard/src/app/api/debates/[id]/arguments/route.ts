@@ -1,5 +1,6 @@
 import { getDebateArgumentRepository } from '@/lib/db';
-import { jsonResponse, errorResponse, newId, parseBody } from '@/lib/api-utils';
+import { getDebateOrchestrator } from '@/lib/daemon';
+import { jsonResponse, errorResponse, parseBody } from '@/lib/api-utils';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,20 +16,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     position: string;
     argument: string;
     evidence?: string;
-    round?: number;
   }>(req);
   if (!body?.agentId || !body?.position || !body?.argument) {
     return errorResponse('agentId, position, and argument are required');
   }
-  const repo = getDebateArgumentRepository();
-  const arg = repo.create({
-    id: newId(),
-    debateId: id,
-    agentId: body.agentId,
-    position: body.position,
-    argument: body.argument,
-    evidence: body.evidence ?? null,
-    round: body.round ?? 1,
-  });
-  return jsonResponse(arg, 201);
+  const orchestrator = getDebateOrchestrator();
+  try {
+    const arg = orchestrator.submitArgument(id, body.agentId, body.position, body.argument, body.evidence);
+    return jsonResponse(arg, 201);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return errorResponse(msg, 400);
+  }
 }
