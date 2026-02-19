@@ -61,6 +61,13 @@ export class SmartAssignmentService {
     const ticket = this.ticketRepo.findById(ticketId);
     if (!ticket) throw new Error(`Ticket not found: ${ticketId}`);
 
+    // Guard: skip assignment if ticket already has an agent (e.g. retry scenario)
+    if (ticket.assignedAgentId) {
+      const analysis = this.fallbackAnalysis(ticket.title, ticket.description, ticket.priority);
+      const selectedModel = this.modelSelector.select(analysis);
+      return { agentId: ticket.assignedAgentId, isNewAgent: false, selectedModel, reasoning: 'Already assigned' };
+    }
+
     // Step 1: Analyze ticket
     const analysis = await this.analyzeTicket(ticket.title, ticket.description, ticket.priority);
 

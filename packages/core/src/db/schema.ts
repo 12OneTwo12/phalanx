@@ -124,7 +124,7 @@ export const agents = sqliteTable('agents', {
   role: text('role', {
     enum: ['team-lead', 'backend', 'frontend', 'qa', 'devops', 'customer'],
   }).notNull(),
-  name: text('name').notNull(),
+  name: text('name').notNull().unique(),
   status: text('status', {
     enum: ['idle', 'running', 'completed', 'error', 'escalated'],
   })
@@ -320,6 +320,27 @@ export const escalations = sqliteTable('escalations', {
 
 export type Escalation = typeof escalations.$inferSelect;
 export type NewEscalation = typeof escalations.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Execution Traces
+// ---------------------------------------------------------------------------
+
+export const executionTraces = sqliteTable('execution_traces', {
+  id: text('id').primaryKey(),
+  ticketId: text('ticket_id').references(() => tickets.id, { onDelete: 'set null' }),
+  agentId: text('agent_id').references(() => agents.id, { onDelete: 'set null' }),
+  status: text('status').notNull(), // 'completed' | 'error' | 'escalated'
+  iterations: integer('iterations').notNull().default(0),
+  toolCallCount: integer('tool_call_count').notNull().default(0),
+  conversationHistory: text('conversation_history').notNull(), // JSON
+  tokenUsage: text('token_usage'), // JSON
+  finalContent: text('final_content'),
+  error: text('error'),
+  ...timestamps,
+});
+
+export type ExecutionTrace = typeof executionTraces.$inferSelect;
+export type NewExecutionTrace = typeof executionTraces.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // Work Logs

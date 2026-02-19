@@ -108,7 +108,10 @@ export class AgentConfigurator {
       const name = result.content.trim().replace(/[^a-zA-Z0-9\s-]/g, '').slice(0, 20);
 
       if (name && !existingNames.includes(name)) {
-        return name;
+        // Double-check against DB to handle race conditions
+        if (!this.agentRepo.findByName(name)) {
+          return name;
+        }
       }
     } catch {
       // Graceful fallback below

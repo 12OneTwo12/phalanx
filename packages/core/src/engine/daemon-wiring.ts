@@ -30,6 +30,7 @@ import type { AutoCommenter } from './auto-commenter.js';
 import type { WorkLogRecorder } from './work-log-recorder.js';
 import type { MeetingOrchestrator } from './meeting-orchestrator.js';
 import type { DebateOrchestrator } from './debate-orchestrator.js';
+import type { ApprovalService } from './approval-service.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -56,6 +57,10 @@ export interface DaemonDeps {
   meetingOrchestrator?: MeetingOrchestrator;
   /** Optional debate orchestrator for intra-role debates */
   debateOrchestrator?: DebateOrchestrator;
+  /** Optional approval service for auto-approve mode */
+  approvalService?: ApprovalService;
+  /** Callback to read current approval mode at runtime (supports config changes via API) */
+  getApprovalMode?: () => 'manual' | 'auto';
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +156,20 @@ export class DaemonWiring {
           });
         }
       });
+    }
+
+    // 5b. Auto-approve pending tickets when configured
+    {
+      const { orchestratorScheduler, approvalService, getApprovalMode } = this.deps;
+      if (approvalService && getApprovalMode) {
+        this.on(orchestratorScheduler, 'scheduler:tick', () => {
+          if (getApprovalMode() === 'auto') {
+            try {
+              approvalService.approveAll();
+            } catch { /* auto-approve failure is non-fatal */ }
+          }
+        });
+      }
     }
 
     // 6. Ticket failure handling — retry or escalate + release agent

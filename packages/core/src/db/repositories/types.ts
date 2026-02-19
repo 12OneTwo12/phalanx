@@ -6,8 +6,8 @@ export interface Repository<T, TNew> {
   /** Find a record by its primary key */
   findById(id: string): T | undefined;
 
-  /** Find all records, optionally with a limit and offset */
-  findAll(options?: { limit?: number; offset?: number }): T[];
+  /** Find all records, optionally with a limit, offset, and sort order */
+  findAll(options?: { limit?: number; offset?: number; orderBy?: 'asc' | 'desc' }): T[];
 
   /** Create a new record and return it */
   create(data: TNew): T;

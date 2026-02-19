@@ -22,3 +22,4 @@ export { DebateRepository } from './debate.repository.js';
 export { DebateArgumentRepository } from './debate-argument.repository.js';
 export { MeetingRepository } from './meeting.repository.js';
 export { MeetingParticipantRepository } from './meeting-participant.repository.js';
+export { ExecutionTraceRepository } from './execution-trace.repository.js';

@@ -6,3 +6,5 @@ export { up as migrateUp0002, down as migrateDown0002, MIGRATION_ID as MIGRATION
 export { up as migrateUp0003, down as migrateDown0003, MIGRATION_ID as MIGRATION_ID_0003 } from './migrations/0003_ticket_comments.js';
 export { up as migrateUp0004, down as migrateDown0004, MIGRATION_ID as MIGRATION_ID_0004 } from './migrations/0004_debates_meetings.js';
 export { up as migrateUp0005, down as migrateDown0005 } from './migrations/0005_channel_providers.js';
+export { up as migrateUp0006, down as migrateDown0006 } from './migrations/0006_execution_traces.js';
+export { up as migrateUp0007, down as migrateDown0007 } from './migrations/0007_agent_name_unique.js';

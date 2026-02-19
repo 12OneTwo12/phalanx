@@ -2,12 +2,14 @@
  * Agent ticket executor — implements TicketExecutor by delegating to AgentExecutor.
  * Handles branch isolation, context injection, and result conversion.
  */
+import { randomUUID } from 'crypto';
 import type { Ticket } from '../db/schema.js';
 import type { AgentExecutor } from '../agents/agent-executor.js';
 import type { AgentConfig, AgentRole, AgentExecutionResult } from '../agents/types.js';
 import type { SoulLoader } from '../agents/soul-loader.js';
 import type { ResolvedModel, ThinkingLevel } from '../llm/types.js';
 import type { AgentToolPermissions } from '../tools/types.js';
+import type { ExecutionTraceRepository } from '../db/repositories/execution-trace.repository.js';
 import type { TicketExecutor } from './orchestrator.js';
 import type { BranchManager } from './branch-manager.js';
 
@@ -102,6 +104,7 @@ export class DefaultAgentConfigResolver implements AgentConfigResolver {
 
 export class AgentTicketExecutor implements TicketExecutor {
   private readonly postExecutionHooks: PostExecutionHook[] = [];
+  private executionTraceRepo?: ExecutionTraceRepository;
 
   constructor(
     private readonly agentExecutor: AgentExecutor,
@@ -114,6 +117,11 @@ export class AgentTicketExecutor implements TicketExecutor {
   /** Register a hook to be called after each ticket execution */
   addPostExecutionHook(hook: PostExecutionHook): void {
     this.postExecutionHooks.push(hook);
+  }
+
+  /** Set the execution trace repository for persisting execution traces */
+  setExecutionTraceRepo(repo: ExecutionTraceRepository): void {
+    this.executionTraceRepo = repo;
   }
 
   /**
@@ -139,6 +147,24 @@ export class AgentTicketExecutor implements TicketExecutor {
 
       // Execute agent
       const result = await this.agentExecutor.run(agentConfig, task);
+
+      // Save execution trace (non-fatal)
+      if (this.executionTraceRepo) {
+        try {
+          this.executionTraceRepo.create({
+            id: randomUUID(),
+            ticketId: ticket.id,
+            agentId: ticket.assignedAgentId ?? null,
+            status: result.status,
+            iterations: result.iterations,
+            toolCallCount: result.toolCallCount,
+            conversationHistory: JSON.stringify(result.conversationHistory),
+            tokenUsage: JSON.stringify(result.totalUsage),
+            finalContent: result.finalContent,
+            error: result.error ?? null,
+          });
+        } catch { /* trace saving is non-fatal */ }
+      }
 
       // Run post-execution hooks (fire-and-forget, don't fail the ticket)
       for (const hook of this.postExecutionHooks) {

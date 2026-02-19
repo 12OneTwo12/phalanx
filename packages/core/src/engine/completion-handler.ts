@@ -74,7 +74,7 @@ export class CompletionHandler extends EventEmitter {
         }
       }
 
-      this.emit('ticket:completed', { ticketId });
+      this.emit('ticket:completed', { ticketId, agentId: ticket.assignedAgentId });
     } finally {
       // Agent release must happen regardless of goal progress errors
       if (ticket.assignedAgentId) {
@@ -104,7 +104,7 @@ export class CompletionHandler extends EventEmitter {
         status: 'pending',
         blockedTasks: JSON.stringify([ticketId]),
       });
-      this.emit('ticket:escalated', { ticketId });
+      this.emit('ticket:escalated', { ticketId, agentId: ticket.assignedAgentId });
     } finally {
       // Agent release must happen regardless of escalation record creation errors
       if (ticket.assignedAgentId) {
@@ -140,7 +140,7 @@ export class CompletionHandler extends EventEmitter {
         status: retrying,
         retryCount: ticket.retryCount + 1,
       });
-      this.emit('ticket:retrying', { ticketId, retryCount: ticket.retryCount + 1 });
+      this.emit('ticket:retrying', { ticketId, retryCount: ticket.retryCount + 1, agentId: ticket.assignedAgentId });
     } else {
       // Max retries exceeded → escalate and release agent
       try {
@@ -155,7 +155,7 @@ export class CompletionHandler extends EventEmitter {
           status: 'pending',
           blockedTasks: JSON.stringify([ticketId]),
         });
-        this.emit('ticket:escalated', { ticketId });
+        this.emit('ticket:escalated', { ticketId, agentId: ticket.assignedAgentId });
       } finally {
         if (ticket.assignedAgentId) {
           this.assignmentService.release(ticket.assignedAgentId);

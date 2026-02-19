@@ -7,7 +7,7 @@
  * abstraction. Each concrete repository is still fully type-safe at its
  * public API boundary via TSelect / TInsert.
  */
-import { eq } from 'drizzle-orm';
+import { eq, desc, asc } from 'drizzle-orm';
 import type { SQLiteTableWithColumns } from 'drizzle-orm/sqlite-core';
 import type { DrizzleDB } from '../database.js';
 import type { Repository } from './types.js';
@@ -33,8 +33,12 @@ export abstract class BaseRepository<
     return (this.db.select().from(this.table) as any).where(eq((this.table as any).id, id)).get() as TSelect | undefined;
   }
 
-  findAll(options?: { limit?: number; offset?: number }): TSelect[] {
+  findAll(options?: { limit?: number; offset?: number; orderBy?: 'asc' | 'desc' }): TSelect[] {
     let query = (this.db.select().from(this.table) as any).$dynamic();
+    if (options?.orderBy && (this.table as any).createdAt) {
+      const col = (this.table as any).createdAt;
+      query = query.orderBy(options.orderBy === 'desc' ? desc(col) : asc(col));
+    }
     if (options?.limit) query = query.limit(options.limit);
     if (options?.offset) query = query.offset(options.offset);
     return query.all() as TSelect[];
