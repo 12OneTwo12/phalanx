@@ -61,25 +61,40 @@ export default function ChannelPage() {
           <p className="py-8 text-center text-gray-600">No messages yet. Start a conversation.</p>
         ) : (
           <div className="space-y-3">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[70%] rounded-lg px-4 py-2 text-sm ${
-                    msg.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-800 text-gray-200'
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
-                  <span className="mt-1 block text-xs opacity-60">
-                    {new Date(msg.createdAt).toLocaleTimeString()}
-                  </span>
+            {messages.map((msg, idx) => {
+              const msgDate = new Date(msg.createdAt);
+              const dateStr = msgDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+              const prevDate = idx > 0 ? new Date(messages[idx - 1].createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }) : null;
+              const showDateSeparator = idx === 0 || dateStr !== prevDate;
+              const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+              const isToday = dateStr === today;
+
+              return (
+                <div key={msg.id}>
+                  {showDateSeparator && (
+                    <div className="my-4 flex items-center gap-3">
+                      <div className="flex-1 border-t border-gray-700" />
+                      <span className="text-xs text-gray-500">{isToday ? '오늘' : dateStr}</span>
+                      <div className="flex-1 border-t border-gray-700" />
+                    </div>
+                  )}
+                  <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      className={`max-w-[70%] rounded-lg px-4 py-2 text-sm ${
+                        msg.role === 'user'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-800 text-gray-200'
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      <span className="mt-1 block text-xs opacity-60">
+                        {msgDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
