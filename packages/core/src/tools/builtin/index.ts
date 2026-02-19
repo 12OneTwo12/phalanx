@@ -15,6 +15,8 @@ export { createTicketCommentTool } from './ticket-comment.js';
 export { createTicketReadCommentsTool } from './ticket-read-comments.js';
 export { createMemoryReadTool } from './memory-read.js';
 export { createMemoryWriteTool } from './memory-write.js';
+export { createRequestDiscussionTool } from './request-discussion.js';
+export { createReadDiscussionsTool } from './read-discussions.js';
 
 // ---------------------------------------------------------------------------
 // All builtin tools (stateless — no DB dependency)

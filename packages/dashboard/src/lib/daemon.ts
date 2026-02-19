@@ -40,9 +40,12 @@ import {
   createMemoryWriteTool,
   MeetingOrchestrator,
   DebateOrchestrator,
+  DiscussionService,
   ApprovalService,
   PRController,
   type PRMode,
+  createRequestDiscussionTool,
+  createReadDiscussionsTool,
 } from '@phalanx/core';
 import * as fs from 'node:fs/promises';
 import {
@@ -63,6 +66,8 @@ import {
   getDebateArgumentRepository,
   getExecutionTraceRepository,
 } from './db';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { eventBus } from './event-bus';
 import { getLLMProvider } from './llm-provider';
 import { findProjectRoot } from './convention-sync';
@@ -106,6 +111,34 @@ const passthroughVerification = {
     return { ticketId, status: 'passed' as const, checks: [], feedback: undefined };
   },
 };
+
+// ---------------------------------------------------------------------------
+// Config helpers
+// ---------------------------------------------------------------------------
+
+interface TeamModeConfig {
+  mode: 'lean' | 'smart' | 'debate';
+  smartThreshold: string;
+  agentsPerRole: number;
+}
+
+function loadTeamModeConfig(): TeamModeConfig {
+  try {
+    const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? findProjectRoot(process.cwd());
+    const configPath = resolve(projectRoot, '.phalanx', 'config.json');
+    if (!existsSync(configPath)) return { mode: 'lean', smartThreshold: 'high', agentsPerRole: 2 };
+    const config = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    const daemon = (config.daemon ?? {}) as Record<string, unknown>;
+    const tm = (daemon.teamMode ?? {}) as Record<string, unknown>;
+    return {
+      mode: (tm.mode as TeamModeConfig['mode']) ?? 'lean',
+      smartThreshold: (tm.smartThreshold as string) ?? 'high',
+      agentsPerRole: (tm.agentsPerRole as number) ?? 2,
+    };
+  } catch {
+    return { mode: 'lean', smartThreshold: 'high', agentsPerRole: 2 };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -168,6 +201,20 @@ function createDaemonWiring(): DaemonState {
 
   const branchManager = new BranchManager(noopGitOps);
 
+  // Load team mode config early — needed for tool allowlist and executor config
+  const teamModeConfig = loadTeamModeConfig();
+
+  const toolAllowlist = [
+    'file_read', 'file_write', 'file_edit',
+    'terminal_exec',
+    'git_status', 'git_diff', 'git_commit',
+    'ticket_comment', 'ticket_read_comments',
+    'memory_read', 'memory_write',
+  ];
+  if (teamModeConfig.mode !== 'lean') {
+    toolAllowlist.push('request_discussion', 'read_discussions');
+  }
+
   const executorConfig = injectConventions(
     {
       defaultModel: {
@@ -178,18 +225,13 @@ function createDaemonWiring(): DaemonState {
       },
       defaultThinkingLevel: 'medium',
       defaultToolPermissions: {
-        allowlist: [
-          'file_read', 'file_write', 'file_edit',
-          'terminal_exec',
-          'git_status', 'git_diff', 'git_commit',
-          'ticket_comment', 'ticket_read_comments',
-          'memory_read', 'memory_write',
-        ],
+        allowlist: toolAllowlist,
         denylist: [],
       },
       workingDirectory: projectRoot,
       maxIterations: 20,
       baseBranch: 'main',
+      teamMode: teamModeConfig.mode,
     },
     projectRoot,
   );
@@ -269,6 +311,20 @@ function createDaemonWiring(): DaemonState {
     debateRepo: getDebateRepository(),
     debateArgRepo: getDebateArgumentRepository(),
   });
+
+  // Discussion service — team discussions initiated by agents during execution
+  const discussionService = new DiscussionService({
+    debateOrchestrator,
+    providerRegistry,
+    agentRepo,
+    ticketRepo,
+  });
+
+  // Register discussion tools if team mode allows discussions
+  if (teamModeConfig.mode !== 'lean') {
+    toolRegistry.register(createRequestDiscussionTool(discussionService));
+    toolRegistry.register(createReadDiscussionsTool(debateOrchestrator, ticketRepo));
+  }
 
   // PR controller — reads initial mode from environment
   const prController = new PRController(

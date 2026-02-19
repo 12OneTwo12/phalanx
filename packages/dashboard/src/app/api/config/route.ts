@@ -30,6 +30,7 @@ export async function GET() {
   return jsonResponse({
     approval: daemon.approval ?? { mode: 'manual' },
     pr: daemon.pr ?? { mode: 'manual' },
+    teamMode: daemon.teamMode ?? { mode: 'lean', smartThreshold: 'high', agentsPerRole: 2 },
   });
 }
 
@@ -38,6 +39,7 @@ export async function PATCH(request: Request) {
   const body = await parseBody<{
     approval?: { mode: string };
     pr?: { mode: string; smartRules?: Record<string, unknown> };
+    teamMode?: { mode: string; smartThreshold?: string; agentsPerRole?: number };
   }>(request);
   if (!body) return errorResponse('Request body is required');
 
@@ -55,6 +57,9 @@ export async function PATCH(request: Request) {
     }
     daemon.pr = newPr;
   }
+  if (body.teamMode) {
+    daemon.teamMode = { ...(daemon.teamMode as Record<string, unknown> ?? {}), ...body.teamMode };
+  }
 
   config.daemon = daemon;
   saveConfig(config);
@@ -62,5 +67,6 @@ export async function PATCH(request: Request) {
   return jsonResponse({
     approval: daemon.approval ?? { mode: 'manual' },
     pr: daemon.pr ?? { mode: 'manual' },
+    teamMode: daemon.teamMode ?? { mode: 'lean', smartThreshold: 'high', agentsPerRole: 2 },
   });
 }

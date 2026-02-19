@@ -17,6 +17,7 @@ interface Ticket {
   branch: string | null;
   prUrl: string | null;
   epicId: string;
+  metadata: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -192,6 +193,33 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
         <h3 className="mb-2 text-sm font-semibold text-gray-400">Description</h3>
         <p className="whitespace-pre-wrap text-sm text-gray-200">{ticket.description}</p>
       </div>
+
+      {/* Debate Section */}
+      {ticket.metadata && (() => {
+        try {
+          const meta = JSON.parse(ticket.metadata ?? '{}');
+          if (meta.debateId) {
+            return (
+              <div className="mb-6 rounded-lg border border-purple-800 bg-purple-900/20 p-4">
+                <h3 className="mb-2 text-sm font-semibold text-purple-400">
+                  Design Debate {meta.debateConsensus ? '(Consensus)' : '(Resolved by Lead)'}
+                </h3>
+                <p className="whitespace-pre-wrap text-sm text-gray-300">
+                  {meta.debateConclusion?.slice(0, 500)}
+                  {(meta.debateConclusion?.length ?? 0) > 500 && '...'}
+                </p>
+                <Link
+                  href={`/debates/${meta.debateId}`}
+                  className="mt-2 inline-block text-xs text-purple-400 hover:text-purple-300"
+                >
+                  View full debate →
+                </Link>
+              </div>
+            );
+          }
+        } catch { /* ignore parse errors */ }
+        return null;
+      })()}
 
       {/* Comments */}
       <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">

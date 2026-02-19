@@ -60,6 +60,8 @@ export interface AgentTicketExecutorConfig {
   baseBranch: string;
   /** Convention text to inject into agent prompt */
   conventions?: string;
+  /** Team mode: controls discussion tool hints in prompts */
+  teamMode?: 'lean' | 'smart' | 'debate';
 }
 
 /**
@@ -249,6 +251,26 @@ export class AgentTicketExecutor implements TicketExecutor {
       '2. During work: Post key decisions and progress updates (type: "progress")',
       '3. At completion: Post a summary of what was done (type: "progress")',
     );
+
+    // Team collaboration hints (when discussion tools are available)
+    const mode = this.config.teamMode ?? 'lean';
+    if (mode !== 'lean') {
+      sections.push(
+        '## Team Collaboration',
+        'When you encounter a significant design decision or are unsure about the best approach:',
+        '- Use `request_discussion` to consult with team members (different AI models provide diverse perspectives)',
+        '- Use `read_discussions` to review past discussions on this ticket',
+        '- Good topics for discussion: architecture choices, database schema design, API contracts, major refactoring',
+      );
+
+      if (mode === 'debate') {
+        sections.push(
+          '',
+          'IMPORTANT: You are in Debate mode. Before starting implementation,',
+          'use `request_discussion` to discuss your planned approach with the team.',
+        );
+      }
+    }
 
     return sections.join('\n\n');
   }

@@ -26,6 +26,7 @@ interface CredentialStatus {
 interface DaemonConfig {
   approval: { mode: string };
   pr: { mode: string; smartRules?: SmartRules };
+  teamMode?: { mode: string; smartThreshold?: string; agentsPerRole?: number };
 }
 
 interface SmartRules {
@@ -300,6 +301,86 @@ function CredentialsSection() {
 }
 
 // ---------------------------------------------------------------------------
+// Section: Team Mode
+// ---------------------------------------------------------------------------
+
+const TEAM_MODE_DESCRIPTIONS: Record<string, string> = {
+  lean: 'Single agent per ticket. No team discussions. Fastest and cheapest.',
+  smart: 'Agents can initiate team discussions when facing design decisions. Different AI models provide diverse perspectives. (Recommended)',
+  debate: 'Agents must discuss their approach with the team before implementing. Most thorough but slowest.',
+};
+
+function TeamModeSection({ config, onSave }: { config: DaemonConfig | undefined; onSave: () => void }) {
+  const currentMode = config?.teamMode?.mode ?? 'lean';
+  const threshold = config?.teamMode?.smartThreshold ?? 'high';
+  const [saving, setSaving] = useState(false);
+
+  const handleModeChange = async (mode: string) => {
+    setSaving(true);
+    try {
+      await apiPatch('/config', { teamMode: { mode } });
+      onSave();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleThresholdChange = async (smartThreshold: string) => {
+    setSaving(true);
+    try {
+      await apiPatch('/config', { teamMode: { mode: 'smart', smartThreshold } });
+      onSave();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="mb-8">
+      <h3 className="mb-3 text-lg font-semibold">Team Mode</h3>
+      <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
+        <div className="flex gap-4">
+          {['lean', 'smart', 'debate'].map((mode) => (
+            <label key={mode} className="flex cursor-pointer items-center gap-2">
+              <input
+                type="radio"
+                name="team-mode"
+                value={mode}
+                checked={currentMode === mode}
+                onChange={() => handleModeChange(mode)}
+                disabled={saving}
+                className="accent-blue-500"
+              />
+              <span className="text-sm capitalize text-gray-200">{mode}</span>
+            </label>
+          ))}
+        </div>
+
+        {currentMode === 'smart' && (
+          <div className="mt-4 border-t border-gray-700 pt-4">
+            <label className="mb-1 block text-xs text-gray-400">Complexity Threshold</label>
+            <select
+              value={threshold}
+              onChange={(e) => handleThresholdChange(e.target.value)}
+              disabled={saving}
+              className="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="low">Low — debate most tickets</option>
+              <option value="medium">Medium — debate moderately complex tickets</option>
+              <option value="high">High — debate only highly complex tickets</option>
+            </select>
+          </div>
+        )}
+
+        <p className="mt-2 text-xs text-gray-500">
+          {TEAM_MODE_DESCRIPTIONS[currentMode] ?? ''}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Section: Ticket Approval Mode
 // ---------------------------------------------------------------------------
 
@@ -485,6 +566,7 @@ export default function SettingsPage() {
       <h2 className="mb-6 text-2xl font-bold">Settings</h2>
       <ProvidersSection />
       <CredentialsSection />
+      <TeamModeSection config={config} onSave={reloadConfig} />
       <ApprovalSection config={config} onSave={reloadConfig} />
       <PRModeSection config={config} onSave={reloadConfig} />
     </div>

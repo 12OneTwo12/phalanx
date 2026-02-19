@@ -54,5 +54,6 @@ export {
 export { AutoCommenter } from './auto-commenter.js';
 export { WorkLogRecorder } from './work-log-recorder.js';
 export { DebateOrchestrator, type DebateOrchestratorDeps, type DebateEvents } from './debate-orchestrator.js';
+export { DiscussionService, type DiscussionServiceDeps, type DiscussionRequest, type DiscussionResult } from './discussion-service.js';
 export { MeetingOrchestrator, type MeetingOrchestratorDeps, type MeetingConfig, type MeetingEvents } from './meeting-orchestrator.js';
 export { DailySummaryGenerator, type DailySummary, type AgentDailySummary } from './daily-summary-generator.js';
