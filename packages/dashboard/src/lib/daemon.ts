@@ -36,6 +36,8 @@ import {
   WorkLogRecorder,
   createTicketCommentTool,
   createTicketReadCommentsTool,
+  createMemoryReadTool,
+  createMemoryWriteTool,
 } from '@phalanx/core';
 import * as fs from 'node:fs/promises';
 import {
@@ -133,6 +135,21 @@ function createDaemonWiring(): DaemonState {
   const commentRepo = getTicketCommentRepository();
   toolRegistry.register(createTicketCommentTool(commentRepo));
   toolRegistry.register(createTicketReadCommentsTool(commentRepo));
+
+  // Register memory tools so agents can read/write their personal MEMORY.md
+  const agentsDir = `${projectRoot}/agents`;
+  const memoryFs = {
+    readFile: (path: string) => fs.readFile(path, 'utf-8'),
+    writeFile: async (path: string, content: string) => {
+      const dir = path.substring(0, path.lastIndexOf('/'));
+      if (dir) await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(path, content, 'utf-8');
+    },
+    ensureDir: (path: string) => fs.mkdir(path, { recursive: true }).then(() => {}),
+  };
+  toolRegistry.register(createMemoryReadTool(agentsDir, memoryFs));
+  toolRegistry.register(createMemoryWriteTool(agentsDir, memoryFs));
+
   const agentExecutor = new AgentExecutor(llmProvider, toolRegistry);
 
   const branchManager = new BranchManager(noopGitOps);
@@ -147,7 +164,13 @@ function createDaemonWiring(): DaemonState {
       },
       defaultThinkingLevel: 'medium',
       defaultToolPermissions: {
-        allowlist: ['file_read', 'file_write', 'file_edit', 'terminal_exec', 'git_status', 'git_diff', 'git_commit'],
+        allowlist: [
+          'file_read', 'file_write', 'file_edit',
+          'terminal_exec',
+          'git_status', 'git_diff', 'git_commit',
+          'ticket_comment', 'ticket_read_comments',
+          'memory_read', 'memory_write',
+        ],
         denylist: [],
       },
       workingDirectory: projectRoot,
@@ -166,17 +189,6 @@ function createDaemonWiring(): DaemonState {
   );
 
   // Wire MemoryUpdateHook so agents persist learnings to MEMORY.md
-  const agentsDir = `${projectRoot}/agents`;
-  const memoryFs = {
-    readFile: (path: string) => fs.readFile(path, 'utf-8'),
-    writeFile: async (path: string, content: string) => {
-      // Ensure parent directory exists for per-agent memory files
-      const dir = path.substring(0, path.lastIndexOf('/'));
-      await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(path, content, 'utf-8');
-    },
-    ensureDir: (path: string) => fs.mkdir(path, { recursive: true }).then(() => {}),
-  };
   ticketExecutor.addPostExecutionHook(new MemoryUpdateHook(templatesDir, memoryFs, agentsDir));
 
   // Engine services
