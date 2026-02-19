@@ -1,9 +1,9 @@
 /**
  * MemoryWriter — appends learnings to an agent's MEMORY.md file.
  *
- * After a ticket execution, the agent may produce learnings (patterns,
- * pitfalls, useful commands, etc.). MemoryWriter persists these to
- * `{templatesDir}/{role}/MEMORY.md` so future executions benefit.
+ * Supports two write targets:
+ *   1. Role-level: `{templatesDir}/{role}/MEMORY.md` (shared knowledge per role)
+ *   2. Per-agent: arbitrary path via `appendLearningsToPath` (individual memory)
  */
 import type { AgentRole } from './types.js';
 
@@ -24,6 +24,8 @@ export interface MemoryEntry {
 export interface MemoryFileSystem {
   readFile(path: string): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
+  /** Ensure a directory exists (optional, used for per-agent memory) */
+  ensureDir?(path: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -70,9 +72,30 @@ export class MemoryWriter {
    */
   async appendLearnings(role: AgentRole, entries: MemoryEntry[]): Promise<number> {
     if (entries.length === 0) return 0;
-
     const memoryPath = `${this.templatesDir}/${role}/MEMORY.md`;
+    return this.appendToFile(memoryPath, entries);
+  }
 
+  /**
+   * Append learnings to an arbitrary MEMORY.md path.
+   * Used for per-agent memory files. Ensures parent directory exists.
+   */
+  async appendLearningsToPath(memoryPath: string, entries: MemoryEntry[]): Promise<number> {
+    if (entries.length === 0) return 0;
+
+    // Ensure parent directory exists
+    const parentDir = memoryPath.substring(0, memoryPath.lastIndexOf('/'));
+    if (parentDir && this.fs.ensureDir) {
+      await this.fs.ensureDir(parentDir);
+    }
+
+    return this.appendToFile(memoryPath, entries);
+  }
+
+  /**
+   * Core append logic: read existing, deduplicate, format, write.
+   */
+  private async appendToFile(memoryPath: string, entries: MemoryEntry[]): Promise<number> {
     let existing = '';
     try {
       existing = await this.fs.readFile(memoryPath);
@@ -81,7 +104,6 @@ export class MemoryWriter {
     }
 
     // Deduplicate: skip entries whose formatted line already exists in MEMORY.md.
-    // Use the exact formatted pattern to avoid false positives from substring matching.
     const existingLines = new Set(existing.split('\n').map(l => l.trim()));
     const newEntries = entries.filter(e => {
       const ticketTag = e.ticketId ? ` _(${e.ticketId})_` : '';

@@ -24,6 +24,7 @@ export interface PostExecutionHook {
     role: AgentRole;
     result: AgentExecutionResult;
     ticketId: string;
+    agentId?: string;
   }): Promise<void>;
 }
 
@@ -146,6 +147,7 @@ export class AgentTicketExecutor implements TicketExecutor {
             role: resolved.role,
             result,
             ticketId: ticket.id,
+            agentId: ticket.assignedAgentId ?? undefined,
           });
         } catch (hookErr) {
           // Hook failure should not affect ticket result

@@ -14,6 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/goals', label: 'Goals', icon: '🎯' },
   { href: '/tickets', label: 'Tickets', icon: '🎫' },
   { href: '/agents', label: 'Agents', icon: '🤖' },
+  { href: '/skills', label: 'Skills', icon: '🛠️' },
   { href: '/heartbeat', label: 'Heartbeat', icon: '💓' },
   { href: '/activity', label: 'Activity', icon: '📜' },
   { href: '/conventions', label: 'Conventions', icon: '📐' },

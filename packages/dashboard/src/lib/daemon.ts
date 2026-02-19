@@ -166,11 +166,18 @@ function createDaemonWiring(): DaemonState {
   );
 
   // Wire MemoryUpdateHook so agents persist learnings to MEMORY.md
+  const agentsDir = `${projectRoot}/agents`;
   const memoryFs = {
     readFile: (path: string) => fs.readFile(path, 'utf-8'),
-    writeFile: (path: string, content: string) => fs.writeFile(path, content, 'utf-8'),
+    writeFile: async (path: string, content: string) => {
+      // Ensure parent directory exists for per-agent memory files
+      const dir = path.substring(0, path.lastIndexOf('/'));
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(path, content, 'utf-8');
+    },
+    ensureDir: (path: string) => fs.mkdir(path, { recursive: true }).then(() => {}),
   };
-  ticketExecutor.addPostExecutionHook(new MemoryUpdateHook(templatesDir, memoryFs));
+  ticketExecutor.addPostExecutionHook(new MemoryUpdateHook(templatesDir, memoryFs, agentsDir));
 
   // Engine services
   const orchestrator = new Orchestrator(ticketRepo, ticketExecutor);

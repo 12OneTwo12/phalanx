@@ -4,6 +4,7 @@ import { MemoryWriter, type MemoryFileSystem } from '../../src/agents/memory-wri
 /** In-memory filesystem for testing */
 class MockFS implements MemoryFileSystem {
   files = new Map<string, string>();
+  dirs = new Set<string>();
 
   async readFile(path: string): Promise<string> {
     const content = this.files.get(path);
@@ -13,6 +14,10 @@ class MockFS implements MemoryFileSystem {
 
   async writeFile(path: string, content: string): Promise<void> {
     this.files.set(path, content);
+  }
+
+  async ensureDir(path: string): Promise<void> {
+    this.dirs.add(path);
   }
 }
 
@@ -131,6 +136,45 @@ Not a list item
       expect(count).toBe(1);
       const content = await mockFs.readFile('/templates/devops/MEMORY.md');
       expect(content).toContain('_(TK-42)_');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // appendLearningsToPath (per-agent memory)
+  // -----------------------------------------------------------------------
+
+  describe('appendLearningsToPath', () => {
+    it('should write to the specified path', async () => {
+      const entries = [{ category: 'pattern', content: 'Always validate input' }];
+      const count = await writer.appendLearningsToPath('/agents/agent-1/MEMORY.md', entries);
+      expect(count).toBe(1);
+
+      const content = await mockFs.readFile('/agents/agent-1/MEMORY.md');
+      expect(content).toContain('**[pattern]** Always validate input');
+    });
+
+    it('should ensure parent directory exists', async () => {
+      const entries = [{ category: 'tool', content: 'Use vitest' }];
+      await writer.appendLearningsToPath('/agents/agent-2/MEMORY.md', entries);
+      expect(mockFs.dirs.has('/agents/agent-2')).toBe(true);
+    });
+
+    it('should deduplicate against existing per-agent memory', async () => {
+      mockFs.files.set('/agents/agent-3/MEMORY.md', '- **[pattern]** Existing learning');
+
+      const count = await writer.appendLearningsToPath('/agents/agent-3/MEMORY.md', [
+        { category: 'pattern', content: 'Existing learning' },
+        { category: 'new', content: 'Fresh insight' },
+      ]);
+
+      expect(count).toBe(1);
+      const content = await mockFs.readFile('/agents/agent-3/MEMORY.md');
+      expect(content).toContain('Fresh insight');
+    });
+
+    it('should return 0 for empty entries', async () => {
+      const count = await writer.appendLearningsToPath('/agents/x/MEMORY.md', []);
+      expect(count).toBe(0);
     });
   });
 });

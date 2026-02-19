@@ -1,8 +1,8 @@
 'use client';
 
-import { use } from 'react';
-import useSWR from 'swr';
-import { fetcher } from '@/lib/api-client';
+import { use, useState, useCallback } from 'react';
+import useSWR, { mutate } from 'swr';
+import { fetcher, apiPatch } from '@/lib/api-client';
 import type { Agent } from '@phalanx/core';
 import Link from 'next/link';
 import { SoulEditor } from '@/components/soul-editor';
@@ -21,6 +21,35 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   const { data: agent, isLoading } = useSWR<Agent>(`/api/agents/${id}`, fetcher);
   const ticketTitles = useTicketTitles();
 
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', provider: '', model: '' });
+  const [saving, setSaving] = useState(false);
+
+  const startEditing = useCallback(() => {
+    if (!agent) return;
+    setEditForm({
+      name: agent.name,
+      provider: agent.provider ?? '',
+      model: agent.model ?? '',
+    });
+    setEditing(true);
+  }, [agent]);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      await apiPatch(`/agents/${id}`, {
+        name: editForm.name,
+        provider: editForm.provider || null,
+        model: editForm.model || null,
+      });
+      await mutate(`/api/agents/${id}`);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }, [id, editForm]);
+
   if (isLoading) return <p className="text-gray-500">Loading...</p>;
   if (!agent) return <p className="text-gray-500">Agent not found</p>;
 
@@ -31,21 +60,82 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
       </Link>
 
       <div className="mb-6">
-        <h2 className="text-2xl font-bold">{agent.name}</h2>
-        <div className="mt-2 flex items-center gap-3 text-sm">
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[agent.status] ?? ''}`}>
-            {agent.status}
-          </span>
-          <span className="text-gray-400">Role: {agent.role}</span>
-          {agent.provider && <span className="text-gray-500">{agent.provider}/{agent.model}</span>}
-        </div>
-        {agent.currentTicketId && (
-          <p className="mt-2 text-sm text-gray-400">
-            Currently working on:{' '}
-            <Link href={`/tickets/${agent.currentTicketId}`} className="text-gray-300 hover:text-blue-400">
-              {ticketTitles.get(agent.currentTicketId) ?? agent.currentTicketId}
-            </Link>
-          </p>
+        {editing ? (
+          <div className="space-y-3 rounded-lg border border-gray-700 bg-gray-900 p-4">
+            <div>
+              <label className="mb-1 block text-xs text-gray-400">Name</label>
+              <input
+                type="text"
+                value={editForm.name}
+                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-400">Provider</label>
+                <input
+                  type="text"
+                  value={editForm.provider}
+                  onChange={(e) => setEditForm((f) => ({ ...f, provider: e.target.value }))}
+                  placeholder="anthropic"
+                  className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-gray-400">Model</label>
+                <input
+                  type="text"
+                  value={editForm.model}
+                  onChange={(e) => setEditForm((f) => ({ ...f, model: e.target.value }))}
+                  placeholder="claude-sonnet-4-5-20250929"
+                  className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSave}
+                disabled={saving || !editForm.name.trim()}
+                className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                className="rounded-md bg-gray-700 px-4 py-1.5 text-sm text-gray-300 hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold">{agent.name}</h2>
+              <button
+                onClick={startEditing}
+                className="rounded-md bg-gray-800 px-3 py-1 text-xs text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+              >
+                Edit
+              </button>
+            </div>
+            <div className="mt-2 flex items-center gap-3 text-sm">
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[agent.status] ?? ''}`}>
+                {agent.status}
+              </span>
+              <span className="text-gray-400">Role: {agent.role}</span>
+              {agent.provider && <span className="text-gray-500">{agent.provider}/{agent.model}</span>}
+            </div>
+            {agent.currentTicketId && (
+              <p className="mt-2 text-sm text-gray-400">
+                Currently working on:{' '}
+                <Link href={`/tickets/${agent.currentTicketId}`} className="text-gray-300 hover:text-blue-400">
+                  {ticketTitles.get(agent.currentTicketId) ?? agent.currentTicketId}
+                </Link>
+              </p>
+            )}
+          </>
         )}
       </div>
 
