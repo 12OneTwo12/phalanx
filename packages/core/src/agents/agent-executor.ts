@@ -294,6 +294,7 @@ export class AgentExecutor {
       agentId: config.id,
       workingDirectory: config.workingDirectory,
       timeout: 120_000,
+      ticketId: config.ticketId,
     };
 
     try {

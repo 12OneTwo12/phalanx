@@ -10,8 +10,11 @@ import { terminalExecTool } from './terminal-exec.js';
 import { githubPrTool } from './github-pr.js';
 import { codeAnalyzeTool } from './code-analyze.js';
 
+// Factory-based tools (require dependency injection)
+export { createTicketCommentTool } from './ticket-comment.js';
+
 // ---------------------------------------------------------------------------
-// All builtin tools
+// All builtin tools (stateless — no DB dependency)
 // ---------------------------------------------------------------------------
 
 export const BUILTIN_TOOLS: Tool[] = [

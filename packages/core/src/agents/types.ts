@@ -43,6 +43,8 @@ export interface AgentConfig {
   maxIterations: number;
   temperature?: number;
   thinkingLevel?: ThinkingLevel;
+  /** Current ticket ID this agent is working on */
+  ticketId?: string;
   /** Project conventions to inject into agent system prompt */
   conventions?: string;
   /** Formatted skill content to inject into agent system prompt */

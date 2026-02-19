@@ -41,6 +41,8 @@ export interface ToolExecutionContext {
   timeout?: number;
   /** Security policy for path and command validation */
   securityPolicy?: import('./security-policy.js').SecurityPolicy;
+  /** Current ticket ID the agent is working on (for ticket-scoped tools) */
+  ticketId?: string;
 }
 
 // ---------------------------------------------------------------------------

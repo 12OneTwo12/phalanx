@@ -186,6 +186,7 @@ export class AgentTicketExecutor implements TicketExecutor {
       workingDirectory: this.config.workingDirectory,
       maxIterations: this.config.maxIterations,
       thinkingLevel: resolved.thinkingLevel,
+      ticketId: ticket.id,
       conventions: this.config.conventions,
     };
   }
@@ -208,6 +209,12 @@ export class AgentTicketExecutor implements TicketExecutor {
       '## Instructions',
       'Implement the changes described above. Write clean, tested code.',
       'Commit your changes with conventional commit messages.',
+      '',
+      '## Progress Tracking',
+      'Use the `ticket_comment` tool to document your work:',
+      '1. At the start: Post your implementation plan (type: "plan")',
+      '2. During work: Post key decisions and progress updates (type: "progress")',
+      '3. At completion: Post a summary of what was done (type: "progress")',
     );
 
     return sections.join('\n\n');
