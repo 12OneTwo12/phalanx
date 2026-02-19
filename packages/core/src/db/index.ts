@@ -8,3 +8,4 @@ export { up as migrateUp0004, down as migrateDown0004, MIGRATION_ID as MIGRATION
 export { up as migrateUp0005, down as migrateDown0005 } from './migrations/0005_channel_providers.js';
 export { up as migrateUp0006, down as migrateDown0006 } from './migrations/0006_execution_traces.js';
 export { up as migrateUp0007, down as migrateDown0007 } from './migrations/0007_agent_name_unique.js';
+export { up as migrateUp0008, down as migrateDown0008 } from './migrations/0008_epic_paused_status.js';

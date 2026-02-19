@@ -441,7 +441,15 @@ function createDaemonWiring(): DaemonState {
     eventBus,
     approvalService,
     getApprovalMode: () => {
-      // Read approval mode from environment; config API can update this at runtime
+      // Read approval mode from config file (synced with Settings UI), fallback to env var
+      try {
+        const configPath = resolve(projectRoot, '.phalanx', 'config.json');
+        if (existsSync(configPath)) {
+          const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+          const mode = config?.daemon?.approval?.mode;
+          if (mode === 'auto' || mode === 'manual') return mode;
+        }
+      } catch { /* fall through to env var */ }
       return (process.env.PHALANX_APPROVAL_MODE as 'manual' | 'auto') ?? 'manual';
     },
   };
