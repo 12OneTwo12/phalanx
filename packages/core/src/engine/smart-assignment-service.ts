@@ -1,12 +1,18 @@
 /**
  * SmartAssignmentService — LLM-powered ticket analysis and agent selection/creation.
  * The "brain" of the Orchestrator: analyzes tickets, selects optimal agents, and assigns.
- * Falls back to rule-based analysis when LLM is unavailable.
+ *
+ * Agent reuse strategy:
+ * 1. Prefer idle agents with matching role (domain match priority)
+ * 2. Reclaim stale "running" agents with no active ticket
+ * 3. Create new agent only if under MAX_AGENTS_PER_ROLE cap
+ * 4. If at cap, skip assignment (retry on next tick)
  */
 import { z } from 'zod';
 import type { LLMProvider } from '../llm/types.js';
 import type { AgentRepository } from '../db/repositories/agent.repository.js';
 import type { TicketRepository } from '../db/repositories/ticket.repository.js';
+import type { Agent } from '../db/schema.js';
 import type { ResolvedModel } from '../llm/types.js';
 import type { AgentRole } from '../agents/types.js';
 import type { AssignmentService } from './assignment-service.js';
@@ -16,6 +22,9 @@ import { type ModelSelector, type TicketAnalysis } from './model-selector.js';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+/** Maximum number of agents per role to prevent unbounded creation */
+const MAX_AGENTS_PER_ROLE = 5;
 
 export interface AssignmentResult {
   agentId: string;
@@ -48,16 +57,35 @@ export class SmartAssignmentService {
   ) {}
 
   /**
+   * Reclaim stale agents: agents stuck in "running" but with no active ticket.
+   * Should be called on daemon startup to clean up from previous crashes.
+   */
+  reclaimStaleAgents(): number {
+    const running = this.agentRepo.findByStatus('running');
+    let reclaimed = 0;
+    for (const agent of running) {
+      if (!agent.currentTicketId) {
+        this.agentRepo.update(agent.id, { status: 'idle', currentTicketId: null });
+        reclaimed++;
+      }
+    }
+    if (reclaimed > 0) {
+      console.log(`[phalanx] Reclaimed ${reclaimed} stale agent(s) → idle`);
+    }
+    return reclaimed;
+  }
+
+  /**
    * Analyze a ticket with LLM and assign the optimal agent.
    *
    * Flow:
    * 1. LLM analyzes ticket → TicketAnalysis
    * 2. Select optimal model via ModelSelector
-   * 3. Search for idle agent with matching role
-   * 4. If none → create new agent via AgentConfigurator
+   * 3. Find best available agent (idle > stale reclaim > create new if under cap)
+   * 4. If at agent cap → return null (skip, retry next tick)
    * 5. Assign ticket to agent
    */
-  async smartAssign(ticketId: string): Promise<AssignmentResult> {
+  async smartAssign(ticketId: string): Promise<AssignmentResult | null> {
     const ticket = this.ticketRepo.findById(ticketId);
     if (!ticket) throw new Error(`Ticket not found: ${ticketId}`);
 
@@ -74,23 +102,43 @@ export class SmartAssignmentService {
     // Step 2: Select model based on complexity
     const selectedModel = this.modelSelector.select(analysis);
 
-    // Step 3: Find existing idle agent or create new one
+    // Step 3: Find best available agent or create if under cap
     const role = this.toAgentRole(analysis.requiredRole);
-    const candidates = this.agentRepo.findByRole(role).filter((a) => a.status === 'idle');
 
     let agentId: string;
     let isNewAgent = false;
 
-    if (candidates.length > 0) {
-      const agent = candidates[0];
+    // 3a. Look for idle agents with matching role
+    const idleCandidates = this.agentRepo.findByRole(role).filter((a) => a.status === 'idle');
+
+    if (idleCandidates.length > 0) {
+      const agent = this.findBestCandidate(idleCandidates, analysis);
       this.agentConfigurator.enhanceForTicket(agent, analysis);
       agentId = agent.id;
     } else {
-      const newAgent = await this.agentConfigurator.createConfiguredAgent(
-        ticket, role, analysis, selectedModel,
+      // 3b. Try to reclaim stale running agents (running with no ticket)
+      const stale = this.agentRepo.findByRole(role).filter(
+        (a) => a.status === 'running' && !a.currentTicketId,
       );
-      agentId = newAgent.id;
-      isNewAgent = true;
+      if (stale.length > 0) {
+        const agent = stale[0];
+        this.agentRepo.update(agent.id, { status: 'idle', currentTicketId: null });
+        this.agentConfigurator.enhanceForTicket(agent, analysis);
+        agentId = agent.id;
+      } else {
+        // 3c. Check agent cap before creating new
+        const totalForRole = this.agentRepo.findByRole(role).length;
+        if (totalForRole >= MAX_AGENTS_PER_ROLE) {
+          // At cap — skip this tick, will retry when an agent becomes idle
+          return null;
+        }
+
+        const newAgent = await this.agentConfigurator.createConfiguredAgent(
+          ticket, role, analysis, selectedModel,
+        );
+        agentId = newAgent.id;
+        isNewAgent = true;
+      }
     }
 
     // Step 4: Assign ticket to agent
@@ -102,6 +150,29 @@ export class SmartAssignmentService {
       selectedModel,
       reasoning: `Role: ${analysis.requiredRole}, Complexity: ${analysis.complexity}, Domain: ${analysis.domain}`,
     };
+  }
+
+  /**
+   * Pick the best candidate from idle agents. Prefers agents whose
+   * metadata domain matches the ticket's analysis domain.
+   */
+  private findBestCandidate(candidates: Agent[], analysis: TicketAnalysis): Agent {
+    if (candidates.length === 1) return candidates[0];
+
+    // Prefer domain match
+    for (const agent of candidates) {
+      try {
+        if (agent.metadata) {
+          const meta = JSON.parse(agent.metadata) as Record<string, unknown>;
+          if (meta.domain === analysis.domain || meta.currentDomain === analysis.domain) {
+            return agent;
+          }
+        }
+      } catch { /* skip parse errors */ }
+    }
+
+    // Fallback: first available
+    return candidates[0];
   }
 
   /**

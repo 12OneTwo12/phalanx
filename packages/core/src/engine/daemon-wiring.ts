@@ -147,14 +147,27 @@ export class DaemonWiring {
     if (smartAssignment) {
       const sa = smartAssignment;
       const { orchestratorScheduler } = this.deps;
+      let assigning = false;
 
       this.on(orchestratorScheduler, 'scheduler:tick', () => {
+        // Guard: prevent concurrent assignment runs from overlapping ticks
+        if (assigning) return;
+        assigning = true;
+
         const backlog = ticketRepo.findByStatus('backlog');
-        for (const ticket of backlog) {
-          void sa.smartAssign(ticket.id).catch((err) => {
-            console.warn(`[phalanx] Smart assignment failed for ticket ${ticket.id}:`, err);
-          });
-        }
+        void (async () => {
+          for (const ticket of backlog) {
+            try {
+              const result = await sa.smartAssign(ticket.id);
+              if (result === null) {
+                // At agent cap for this role — stop processing more backlog this tick
+                break;
+              }
+            } catch (err) {
+              console.warn(`[phalanx] Smart assignment failed for ticket ${ticket.id}:`, err);
+            }
+          }
+        })().finally(() => { assigning = false; });
       });
     }
 
@@ -281,6 +294,12 @@ export class DaemonWiring {
   start(): void {
     if (this.started) return;
     this.started = true;
+
+    // Reclaim stale agents from previous crashes before scheduling
+    if (this.deps.smartAssignment) {
+      this.deps.smartAssignment.reclaimStaleAgents();
+    }
+
     this.deps.heartbeatService.start();
     this.deps.orchestratorScheduler.start();
   }
