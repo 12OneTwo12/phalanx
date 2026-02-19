@@ -1,8 +1,12 @@
 /**
  * Server-side database singleton for the dashboard.
- * Lazily initializes the DatabaseManager from @phalanx/core
- * using the PHALANX_DB_PATH environment variable.
+ * Lazily initializes the DatabaseManager from @phalanx/core.
+ *
+ * DB path resolution (in priority order):
+ * 1. PHALANX_DB_PATH env var (set by CLI `serve` command)
+ * 2. {projectRoot}/.phalanx/phalanx.db (auto-detected via findProjectRoot)
  */
+import { resolve } from 'node:path';
 import {
   DatabaseManager,
   migrateUp,
@@ -37,8 +41,15 @@ import {
   MeetingParticipantRepository,
   ExecutionTraceRepository,
 } from '@phalanx/core';
+import { findProjectRoot } from './convention-sync';
 
-const DB_PATH = process.env.PHALANX_DB_PATH ?? 'phalanx.db';
+function resolveDbPath(): string {
+  if (process.env.PHALANX_DB_PATH) return process.env.PHALANX_DB_PATH;
+  const projectRoot = process.env.PHALANX_PROJECT_ROOT ?? findProjectRoot(process.cwd());
+  return resolve(projectRoot, '.phalanx', 'phalanx.db');
+}
+
+const DB_PATH = resolveDbPath();
 
 let migrated = false;
 
