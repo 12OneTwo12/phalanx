@@ -40,6 +40,9 @@ import {
   createMemoryWriteTool,
   MeetingOrchestrator,
   DebateOrchestrator,
+  ApprovalService,
+  PRController,
+  type PRMode,
 } from '@phalanx/core';
 import * as fs from 'node:fs/promises';
 import {
@@ -58,6 +61,7 @@ import {
   getMeetingParticipantRepository,
   getDebateRepository,
   getDebateArgumentRepository,
+  getExecutionTraceRepository,
 } from './db';
 import { eventBus } from './event-bus';
 import { getLLMProvider } from './llm-provider';
@@ -72,6 +76,8 @@ interface DaemonState {
   started: boolean;
   meetingOrchestrator: InstanceType<typeof MeetingOrchestrator>;
   debateOrchestrator: InstanceType<typeof DebateOrchestrator>;
+  prController: PRController;
+  approvalService: ApprovalService;
 }
 
 declare global {
@@ -196,6 +202,9 @@ function createDaemonWiring(): DaemonState {
     new DefaultAgentConfigResolver(),
   );
 
+  // Wire execution trace persistence
+  ticketExecutor.setExecutionTraceRepo(getExecutionTraceRepository());
+
   // Wire MemoryUpdateHook so agents persist learnings to MEMORY.md
   ticketExecutor.addPostExecutionHook(new MemoryUpdateHook(templatesDir, memoryFs, agentsDir));
 
@@ -244,6 +253,9 @@ function createDaemonWiring(): DaemonState {
     { defaultIntervalMs: 60_000 },
   );
 
+  // ApprovalService for manual and auto-approve flows
+  const approvalService = new ApprovalService(ticketRepo);
+
   // AutoCommenter for lifecycle comments on tickets
   const autoCommenter = new AutoCommenter(getTicketCommentRepository());
   const workLogRecorder = new WorkLogRecorder(getWorkLogRepository());
@@ -257,6 +269,11 @@ function createDaemonWiring(): DaemonState {
     debateRepo: getDebateRepository(),
     debateArgRepo: getDebateArgumentRepository(),
   });
+
+  // PR controller — reads initial mode from environment
+  const prController = new PRController(
+    (process.env.PHALANX_PR_MODE as PRMode) ?? 'manual',
+  );
 
   // Wire everything together
   const deps: DaemonDeps = {
@@ -275,12 +292,17 @@ function createDaemonWiring(): DaemonState {
     meetingOrchestrator,
     debateOrchestrator,
     eventBus,
+    approvalService,
+    getApprovalMode: () => {
+      // Read approval mode from environment; config API can update this at runtime
+      return (process.env.PHALANX_APPROVAL_MODE as 'manual' | 'auto') ?? 'manual';
+    },
   };
 
   const wiring = new DaemonWiring(deps);
   wiring.wire();
 
-  return { wiring, started: false, meetingOrchestrator, debateOrchestrator };
+  return { wiring, started: false, meetingOrchestrator, debateOrchestrator, prController, approvalService };
 }
 
 // ---------------------------------------------------------------------------
@@ -351,4 +373,22 @@ export function getMeetingOrchestrator(): InstanceType<typeof MeetingOrchestrato
 export function getDebateOrchestrator(): InstanceType<typeof DebateOrchestrator> {
   const state = globalThis.__phalanx_daemon__ ?? (globalThis.__phalanx_daemon__ = createDaemonWiring());
   return state.debateOrchestrator;
+}
+
+/**
+ * Get the PRController instance (creates daemon if needed).
+ * Used by config API to update PR mode at runtime via setMode().
+ */
+export function getPRController(): PRController {
+  const state = globalThis.__phalanx_daemon__ ?? (globalThis.__phalanx_daemon__ = createDaemonWiring());
+  return state.prController;
+}
+
+/**
+ * Get the ApprovalService instance (creates daemon if needed).
+ * Used by approval API and config API.
+ */
+export function getApprovalService(): ApprovalService {
+  const state = globalThis.__phalanx_daemon__ ?? (globalThis.__phalanx_daemon__ = createDaemonWiring());
+  return state.approvalService;
 }

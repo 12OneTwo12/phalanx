@@ -10,6 +10,8 @@ import {
   migrateUp0003,
   migrateUp0004,
   migrateUp0005,
+  migrateUp0006,
+  migrateUp0007,
   GoalRepository,
   EpicRepository,
   TicketRepository,
@@ -32,6 +34,7 @@ import {
   DebateArgumentRepository,
   MeetingRepository,
   MeetingParticipantRepository,
+  ExecutionTraceRepository,
 } from '@phalanx/core';
 
 const DB_PATH = process.env.PHALANX_DB_PATH ?? 'phalanx.db';
@@ -47,6 +50,8 @@ export function getDb(): DatabaseManager {
     migrateUp0003(db);
     migrateUp0004(db);
     migrateUp0005(db);
+    migrateUp0006(db);
+    migrateUp0007(db);
     migrated = true;
   }
   return db;
@@ -139,4 +144,8 @@ export function getMeetingRepository() {
 
 export function getMeetingParticipantRepository() {
   return new MeetingParticipantRepository(getDb().orm);
+}
+
+export function getExecutionTraceRepository() {
+  return new ExecutionTraceRepository(getDb().orm);
 }

@@ -19,6 +19,7 @@ const STATUS_BADGE: Record<string, string> = {
 export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: agent, isLoading } = useSWR<Agent>(`/api/agents/${id}`, fetcher);
+  const { data: modelCatalog } = useSWR<{ providers: string[]; models: Record<string, { id: string; name: string }[]> }>('/api/models', fetcher);
   const ticketTitles = useTicketTitles();
 
   const [editing, setEditing] = useState(false);
@@ -74,23 +75,37 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs text-gray-400">Provider</label>
-                <input
-                  type="text"
+                <select
                   value={editForm.provider}
-                  onChange={(e) => setEditForm((f) => ({ ...f, provider: e.target.value }))}
-                  placeholder="anthropic"
-                  className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
-                />
+                  onChange={(e) => {
+                    const newProvider = e.target.value;
+                    const providerModels = modelCatalog?.models[newProvider] ?? [];
+                    setEditForm((f) => ({
+                      ...f,
+                      provider: newProvider,
+                      model: providerModels[0]?.id ?? '',
+                    }));
+                  }}
+                  className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="">Select provider</option>
+                  {modelCatalog?.providers.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-gray-400">Model</label>
-                <input
-                  type="text"
+                <select
                   value={editForm.model}
                   onChange={(e) => setEditForm((f) => ({ ...f, model: e.target.value }))}
-                  placeholder="claude-sonnet-4-5-20250929"
-                  className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
-                />
+                  className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="">Select model</option>
+                  {(modelCatalog?.models[editForm.provider] ?? []).map((m) => (
+                    <option key={m.id} value={m.id}>{m.name} ({m.id})</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="flex gap-2">

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const repo = getActivityLogRepository();
 
     // Support combined filters by intersecting results in-memory
-    let results = repo.findAll({ limit: 1000 });
+    let results = repo.findAll({ limit: 1000, orderBy: 'desc' });
 
     if (agentId) {
       results = results.filter((log) => log.agentId === agentId);

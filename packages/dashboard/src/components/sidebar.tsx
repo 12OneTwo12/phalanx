@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/knowledge', label: 'Knowledge', icon: '📚' },
   { href: '/debates', label: 'Debates', icon: '🗣️' },
   { href: '/meetings', label: 'Meetings', icon: '📅' },
+  { href: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
 export function Sidebar() {
