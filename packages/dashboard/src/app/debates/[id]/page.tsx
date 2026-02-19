@@ -4,6 +4,7 @@ import { use } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/api-client';
 import { useEventStream } from '@/hooks/use-event-stream';
+import { useAgentNames } from '@/hooks/use-agent-names';
 import Link from 'next/link';
 
 interface DebateArgument {
@@ -35,6 +36,7 @@ const POSITION_COLORS: Record<string, string> = {
 export default function DebateDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: debate, isLoading, mutate } = useSWR<DebateDetail>(`/api/debates/${id}`, fetcher);
+  const agentNames = useAgentNames();
 
   useEventStream({
     filterPrefix: 'debate:',
@@ -76,7 +78,7 @@ export default function DebateDetailPage({ params }: { params: Promise<{ id: str
               className={`rounded-lg border-l-4 p-4 ${POSITION_COLORS[arg.position] ?? POSITION_COLORS.neutral}`}
             >
               <div className="mb-1 flex items-center gap-2 text-xs">
-                <span className="font-medium text-gray-300">{arg.agentId}</span>
+                <span className="font-medium text-gray-300">{agentNames.get(arg.agentId) ?? arg.agentId.slice(0, 8)}</span>
                 <span className="text-gray-500">Round {arg.round}</span>
                 <span className="rounded bg-gray-700 px-1.5 py-0.5 text-gray-300">
                   {arg.position}

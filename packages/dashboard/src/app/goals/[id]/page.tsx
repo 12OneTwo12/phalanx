@@ -72,15 +72,7 @@ export default function GoalDetailPage({ params }: { params: Promise<{ id: strin
     setDecomposing(true);
     setDecomposeError(null);
     try {
-      const res = await fetch(`/api/goals/${id}/decompose`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'llm' }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(data.error || 'Decomposition failed');
-      }
+      await apiPost(`/goals/${id}/decompose`, { mode: 'llm' });
       await mutate();
     } catch (err) {
       setDecomposeError(err instanceof Error ? err.message : 'Unknown error');

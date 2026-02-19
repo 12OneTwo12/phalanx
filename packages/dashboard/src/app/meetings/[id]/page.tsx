@@ -4,6 +4,7 @@ import { use } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/api-client';
 import { useEventStream } from '@/hooks/use-event-stream';
+import { useAgentNames } from '@/hooks/use-agent-names';
 import Link from 'next/link';
 
 interface MeetingParticipant {
@@ -28,6 +29,7 @@ interface MeetingDetail {
 export default function MeetingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: meeting, isLoading, mutate } = useSWR<MeetingDetail>(`/api/meetings/${id}`, fetcher);
+  const agentNames = useAgentNames();
 
   useEventStream({
     filterPrefix: 'meeting:',
@@ -80,7 +82,7 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           {meeting.participants.map((p) => (
             <div key={p.id} className="rounded-lg border border-gray-800 bg-gray-900 p-4">
               <div className="mb-1 flex items-center gap-2 text-xs">
-                <span className="font-medium text-gray-300">{p.agentId}</span>
+                <span className="font-medium text-gray-300">{agentNames.get(p.agentId) ?? p.agentId.slice(0, 8)}</span>
                 <span className="rounded bg-gray-700 px-1.5 py-0.5 text-gray-400">{p.role}</span>
               </div>
               {p.contributions && (
