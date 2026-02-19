@@ -65,7 +65,7 @@ export class Orchestrator extends EventEmitter {
       if (ticket.status === 'assigned') {
         const inProgress = TicketStateMachine.transition(ticket.status, 'start');
         this.ticketRepo.update(ticket.id, { status: inProgress });
-        this.emit('ticket:started', { ticketId: ticket.id });
+        this.emit('ticket:started', { ticketId: ticket.id, agentId: ticket.assignedAgentId });
       }
       // If already in_progress (retry from verification failure), skip the start transition
 
@@ -76,12 +76,12 @@ export class Orchestrator extends EventEmitter {
         // Transition to verification (from in_progress)
         const verification = TicketStateMachine.transition('in_progress', 'submit');
         this.ticketRepo.update(ticket.id, { status: verification });
-        this.emit('ticket:submitted', { ticketId: ticket.id });
+        this.emit('ticket:submitted', { ticketId: ticket.id, agentId: ticket.assignedAgentId });
       } else {
         // Transition to failed (from in_progress)
         const failed = TicketStateMachine.transition('in_progress', 'error');
         this.ticketRepo.update(ticket.id, { status: failed });
-        this.emit('ticket:failed', { ticketId: ticket.id, error: result.error });
+        this.emit('ticket:failed', { ticketId: ticket.id, agentId: ticket.assignedAgentId, error: result.error });
       }
     } catch (err) {
       // Log the error for debugging — previously silent, making diagnosis impossible
@@ -103,7 +103,7 @@ export class Orchestrator extends EventEmitter {
           context: 'Failed to apply state machine transition during error recovery',
         });
       }
-      this.emit('ticket:error', { ticketId: ticket.id, error: String(err) });
+      this.emit('ticket:error', { ticketId: ticket.id, agentId: ticket.assignedAgentId, error: String(err) });
     } finally {
       this.activeTickets.delete(ticket.id);
     }

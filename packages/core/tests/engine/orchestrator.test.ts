@@ -102,8 +102,8 @@ describe('Orchestrator', () => {
 
     await orch.processQueue();
 
-    expect(startedSpy).toHaveBeenCalledWith({ ticketId: 't1' });
-    expect(submittedSpy).toHaveBeenCalledWith({ ticketId: 't1' });
+    expect(startedSpy).toHaveBeenCalledWith({ ticketId: 't1', agentId: null });
+    expect(submittedSpy).toHaveBeenCalledWith({ ticketId: 't1', agentId: null });
   });
 
   it('should expose activeCount and config', () => {
