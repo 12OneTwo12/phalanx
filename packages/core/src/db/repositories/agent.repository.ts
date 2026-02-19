@@ -15,4 +15,12 @@ export class AgentRepository extends BaseRepository<typeof agents, Agent, NewAge
   findByStatus(status: Agent['status']): Agent[] {
     return this.db.select().from(agents).where(eq(agents.status, status)).all();
   }
+
+  findByName(name: string): Agent | undefined {
+    return this.db.select().from(agents).where(eq(agents.name, name)).get();
+  }
+
+  getAllNames(): string[] {
+    return this.db.select({ name: agents.name }).from(agents).all().map((r) => r.name);
+  }
 }
