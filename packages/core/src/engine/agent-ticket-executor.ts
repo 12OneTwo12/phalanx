@@ -211,6 +211,7 @@ export class AgentTicketExecutor implements TicketExecutor {
       'Commit your changes with conventional commit messages.',
       '',
       '## Progress Tracking',
+      'Before starting, use `ticket_read_comments` to check for prior work or feedback on this ticket.',
       'Use the `ticket_comment` tool to document your work:',
       '1. At the start: Post your implementation plan (type: "plan")',
       '2. During work: Post key decisions and progress updates (type: "progress")',

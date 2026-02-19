@@ -35,6 +35,7 @@ import {
   AutoCommenter,
   WorkLogRecorder,
   createTicketCommentTool,
+  createTicketReadCommentsTool,
 } from '@phalanx/core';
 import * as fs from 'node:fs/promises';
 import {
@@ -128,8 +129,10 @@ function createDaemonWiring(): DaemonState {
   for (const tool of BUILTIN_TOOLS) {
     toolRegistry.register(tool);
   }
-  // Register ticket_comment tool so agents can write comments on their tickets
-  toolRegistry.register(createTicketCommentTool(getTicketCommentRepository()));
+  // Register ticket tools so agents can read/write comments on their tickets
+  const commentRepo = getTicketCommentRepository();
+  toolRegistry.register(createTicketCommentTool(commentRepo));
+  toolRegistry.register(createTicketReadCommentsTool(commentRepo));
   const agentExecutor = new AgentExecutor(llmProvider, toolRegistry);
 
   const branchManager = new BranchManager(noopGitOps);
