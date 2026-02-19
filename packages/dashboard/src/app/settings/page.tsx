@@ -37,47 +37,247 @@ interface SmartRules {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Provider type configuration
 // ---------------------------------------------------------------------------
 
-const KNOWN_CREDENTIAL_PROVIDERS = ['anthropic', 'openai', 'gemini'] as const;
+interface AuthModeOption {
+  value: string;
+  label: string;
+}
+
+interface ProviderTypeConfig {
+  label: string;
+  color: string;
+  authModes: AuthModeOption[];
+  secretPlaceholder?: string;
+  needsBaseUrl?: boolean;
+  defaultBaseUrl?: string;
+  knownModels: string[];
+}
+
+const PROVIDER_TYPES: Record<string, ProviderTypeConfig> = {
+  anthropic: {
+    label: 'Anthropic',
+    color: 'bg-orange-500/20 text-orange-400',
+    authModes: [
+      { value: 'api_key', label: 'API Key' },
+      { value: 'token', label: 'Setup Token' },
+    ],
+    secretPlaceholder: 'sk-ant-...',
+    knownModels: ['claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001', 'claude-opus-4-6'],
+  },
+  openai: {
+    label: 'OpenAI',
+    color: 'bg-green-500/20 text-green-400',
+    authModes: [
+      { value: 'api_key', label: 'API Key' },
+      { value: 'oauth', label: 'OAuth Token' },
+    ],
+    secretPlaceholder: 'sk-...',
+    knownModels: ['gpt-4o', 'gpt-4o-mini', 'o1-preview'],
+  },
+  ollama: {
+    label: 'Ollama',
+    color: 'bg-blue-500/20 text-blue-400',
+    authModes: [],
+    needsBaseUrl: true,
+    defaultBaseUrl: 'http://localhost:11434',
+    knownModels: [],
+  },
+  gemini: {
+    label: 'Gemini',
+    color: 'bg-cyan-500/20 text-cyan-400',
+    authModes: [{ value: 'api_key', label: 'API Key' }],
+    secretPlaceholder: 'AIza...',
+    knownModels: ['gemini-2.0-flash', 'gemini-1.5-pro'],
+  },
+  custom: {
+    label: 'Custom',
+    color: 'bg-gray-500/20 text-gray-400',
+    authModes: [
+      { value: 'api_key', label: 'API Key' },
+      { value: 'token', label: 'Bearer Token' },
+      { value: 'none', label: 'None' },
+    ],
+    needsBaseUrl: true,
+    secretPlaceholder: 'Enter secret...',
+    knownModels: [],
+  },
+};
 
 // ---------------------------------------------------------------------------
-// Section: LLM Providers
+// Section: Unified LLM Providers
 // ---------------------------------------------------------------------------
 
 function ProvidersSection() {
   const { data: providers, isLoading } = useSWR<ProviderConfig[]>('/api/providers', fetcher);
+  const { data: credentials } = useSWR<Record<string, CredentialStatus>>('/api/credentials', fetcher);
+
+  // Add provider state
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ type: 'anthropic', name: '', baseUrl: '', defaultModel: '' });
+  const [addForm, setAddForm] = useState({
+    type: 'anthropic',
+    name: '',
+    baseUrl: '',
+    defaultModel: '',
+    authMode: 'api_key',
+    secret: '',
+  });
   const [saving, setSaving] = useState(false);
 
+  // Configure existing provider state
+  const [configuringId, setConfiguringId] = useState<string | null>(null);
+  const [editAuthMode, setEditAuthMode] = useState('api_key');
+  const [editSecret, setEditSecret] = useState('');
+  const [editBaseUrl, setEditBaseUrl] = useState('');
+  const [editModel, setEditModel] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Test connection state
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Model discovery state
+  const [discoveringId, setDiscoveringId] = useState<string | null>(null);
+  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
+
+  const typeConfig = PROVIDER_TYPES[addForm.type] ?? PROVIDER_TYPES.custom;
+  const needsSecret = typeConfig.authModes.length > 0;
+
+  // Reset add form when type changes
+  const handleTypeChange = (type: string) => {
+    const tc = PROVIDER_TYPES[type] ?? PROVIDER_TYPES.custom;
+    setAddForm({
+      type,
+      name: tc.label,
+      baseUrl: tc.defaultBaseUrl ?? '',
+      defaultModel: '',
+      authMode: tc.authModes[0]?.value ?? 'none',
+      secret: '',
+    });
+  };
+
+  // Add provider: create config + save credential if needed
+  const handleAdd = async () => {
+    if (!addForm.name.trim()) return;
+    setSaving(true);
+    try {
+      await apiPost('/providers', {
+        type: addForm.type,
+        name: addForm.name,
+        baseUrl: addForm.baseUrl || undefined,
+        defaultModel: addForm.defaultModel || undefined,
+      });
+
+      // Save credential if secret provided
+      if (addForm.secret.trim()) {
+        await fetch(`/api/credentials/${addForm.type}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: addForm.secret, authMode: addForm.authMode }),
+        });
+        await mutate('/api/credentials');
+      }
+
+      await mutate('/api/providers');
+      setAddForm({ type: 'anthropic', name: '', baseUrl: '', defaultModel: '', authMode: 'api_key', secret: '' });
+      setAdding(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Toggle provider enabled/disabled
   const toggleEnabled = async (id: string, enabled: boolean) => {
     await apiPatch(`/providers/${id}`, { enabled: !enabled });
     await mutate('/api/providers');
   };
 
+  // Delete provider
   const handleDelete = async (id: string) => {
     await apiDelete(`/providers/${id}`);
     await mutate('/api/providers');
   };
 
-  const handleAdd = async () => {
-    if (!form.name.trim()) return;
-    setSaving(true);
+  // Open configure panel for a provider
+  const openConfigure = (provider: ProviderConfig) => {
+    const tc = PROVIDER_TYPES[provider.type] ?? PROVIDER_TYPES.custom;
+    const cred = credentials?.[provider.type];
+    setConfiguringId(provider.id);
+    setEditAuthMode(cred?.authMode ?? tc.authModes[0]?.value ?? 'none');
+    setEditSecret('');
+    setEditBaseUrl(provider.baseUrl ?? tc.defaultBaseUrl ?? '');
+    setEditModel(provider.defaultModel ?? '');
+    setTestResult(null);
+    setDiscoveredModels([]);
+  };
+
+  // Save configure changes
+  const handleSaveConfigure = async (provider: ProviderConfig) => {
+    setEditSaving(true);
     try {
-      await apiPost('/providers', {
-        type: form.type,
-        name: form.name,
-        baseUrl: form.baseUrl || undefined,
-        defaultModel: form.defaultModel || undefined,
+      // Update provider config (baseUrl, model)
+      await apiPatch(`/providers/${provider.id}`, {
+        baseUrl: editBaseUrl || null,
+        defaultModel: editModel || null,
       });
+
+      // Save credential if secret provided
+      if (editSecret.trim()) {
+        await fetch(`/api/credentials/${provider.type}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: editSecret, authMode: editAuthMode }),
+        });
+        await mutate('/api/credentials');
+      }
+
       await mutate('/api/providers');
-      setForm({ type: 'anthropic', name: '', baseUrl: '', defaultModel: '' });
-      setAdding(false);
+      setConfiguringId(null);
     } finally {
-      setSaving(false);
+      setEditSaving(false);
     }
+  };
+
+  // Test connection
+  const handleTestConnection = async (provider: ProviderConfig) => {
+    setTestingId(provider.id);
+    setTestResult(null);
+    try {
+      const res = await fetch(`/api/providers/${provider.id}/test`, { method: 'POST' });
+      const data = await res.json();
+      setTestResult({ success: data.success, message: data.message });
+    } catch {
+      setTestResult({ success: false, message: 'Request failed' });
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  // Discover models (Ollama)
+  const handleDiscoverModels = async (provider: ProviderConfig) => {
+    setDiscoveringId(provider.id);
+    setDiscoveredModels([]);
+    try {
+      const res = await fetch(`/api/providers/${provider.id}/models`);
+      const data = await res.json();
+      if (data.models?.length > 0) {
+        setDiscoveredModels(data.models);
+      } else {
+        setDiscoveredModels([]);
+        setTestResult({ success: false, message: data.error ?? 'No models found' });
+      }
+    } catch {
+      setTestResult({ success: false, message: 'Discovery request failed' });
+    } finally {
+      setDiscoveringId(null);
+    }
+  };
+
+  // Remove credential
+  const handleRemoveCredential = async (providerType: string) => {
+    await fetch(`/api/credentials/${providerType}`, { method: 'DELETE' });
+    await mutate('/api/credentials');
   };
 
   return (
@@ -85,210 +285,310 @@ function ProvidersSection() {
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-lg font-semibold">LLM Providers</h3>
         <button
-          onClick={() => setAdding(!adding)}
+          onClick={() => { setAdding(!adding); if (!adding) handleTypeChange('anthropic'); }}
           className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500"
         >
           {adding ? 'Cancel' : 'Add Provider'}
         </button>
       </div>
 
+      {/* --- Add Provider Form --- */}
       {adding && (
         <div className="mb-4 space-y-3 rounded-lg border border-gray-700 bg-gray-900 p-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs text-gray-400">Type</label>
+              <label className="mb-1 block text-xs text-gray-400">Provider Type</label>
               <select
-                value={form.type}
-                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+                value={addForm.type}
+                onChange={(e) => handleTypeChange(e.target.value)}
                 className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
               >
-                <option value="anthropic">Anthropic</option>
-                <option value="openai">OpenAI</option>
-                <option value="ollama">Ollama</option>
-                <option value="gemini">Gemini</option>
+                {Object.entries(PROVIDER_TYPES).map(([key, tc]) => (
+                  <option key={key} value={key}>{tc.label}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-400">Name</label>
+              <label className="mb-1 block text-xs text-gray-400">Display Name</label>
               <input
                 type="text"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. My Anthropic"
+                value={addForm.name}
+                onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
                 className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          {/* Base URL for Ollama / Custom */}
+          {typeConfig.needsBaseUrl && (
             <div>
-              <label className="mb-1 block text-xs text-gray-400">Base URL (optional)</label>
+              <label className="mb-1 block text-xs text-gray-400">Base URL</label>
               <input
                 type="text"
-                value={form.baseUrl}
-                onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
-                placeholder="https://api.example.com"
+                value={addForm.baseUrl}
+                onChange={(e) => setAddForm((f) => ({ ...f, baseUrl: e.target.value }))}
+                placeholder={typeConfig.defaultBaseUrl ?? 'https://api.example.com'}
                 className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
               />
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">Default Model (optional)</label>
-              <input
-                type="text"
-                value={form.defaultModel}
-                onChange={(e) => setForm((f) => ({ ...f, defaultModel: e.target.value }))}
-                placeholder="e.g. claude-sonnet-4-5-20250929"
-                className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
-              />
+          )}
+
+          {/* Auth mode + secret for cloud providers */}
+          {needsSecret && (
+            <div className="grid grid-cols-2 gap-3">
+              {typeConfig.authModes.length > 1 && (
+                <div>
+                  <label className="mb-1 block text-xs text-gray-400">Auth Mode</label>
+                  <select
+                    value={addForm.authMode}
+                    onChange={(e) => setAddForm((f) => ({ ...f, authMode: e.target.value }))}
+                    className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+                  >
+                    {typeConfig.authModes.map((am) => (
+                      <option key={am.value} value={am.value}>{am.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className={typeConfig.authModes.length > 1 ? '' : 'col-span-2'}>
+                <label className="mb-1 block text-xs text-gray-400">
+                  {typeConfig.authModes.find((a) => a.value === addForm.authMode)?.label ?? 'Secret'}
+                </label>
+                <input
+                  type="password"
+                  value={addForm.secret}
+                  onChange={(e) => setAddForm((f) => ({ ...f, secret: e.target.value }))}
+                  placeholder={typeConfig.secretPlaceholder ?? 'Enter secret...'}
+                  className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Model selection */}
+          {typeConfig.knownModels.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs text-gray-400">Default Model</label>
+              <select
+                value={addForm.defaultModel}
+                onChange={(e) => setAddForm((f) => ({ ...f, defaultModel: e.target.value }))}
+                className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="">Select model...</option>
+                {typeConfig.knownModels.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {addForm.type === 'ollama' && (
+            <p className="text-xs text-gray-500">
+              Ollama runs locally and requires no API key. Make sure Ollama is running at the specified URL.
+            </p>
+          )}
+
           <button
             onClick={handleAdd}
-            disabled={saving || !form.name.trim()}
+            disabled={saving || !addForm.name.trim()}
             className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
           >
-            {saving ? 'Saving...' : 'Create Provider'}
+            {saving ? 'Saving...' : 'Add Provider'}
           </button>
         </div>
       )}
 
+      {/* --- Provider List --- */}
       {isLoading ? (
         <p className="text-gray-500">Loading...</p>
       ) : !providers?.length ? (
-        <p className="text-gray-500">No providers configured.</p>
+        <p className="text-gray-500">No providers configured. Click &quot;Add Provider&quot; to get started.</p>
       ) : (
         <div className="space-y-3">
-          {providers.map((p) => (
-            <div key={p.id} className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-900 p-4">
-              <div className="flex items-center gap-3">
-                <span className="rounded bg-purple-500/20 px-2 py-0.5 text-xs text-purple-400">
-                  {p.type}
-                </span>
-                <span className="font-medium text-gray-200">{p.name}</span>
-                {p.defaultModel && (
-                  <span className="text-xs text-gray-500">{p.defaultModel}</span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => toggleEnabled(p.id, p.enabled)}
-                  className={`rounded-md px-3 py-1 text-xs ${
-                    p.enabled
-                      ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
-                      : 'bg-gray-600/20 text-gray-400 hover:bg-gray-600/30'
-                  }`}
-                >
-                  {p.enabled ? 'Enabled' : 'Disabled'}
-                </button>
-                <button
-                  onClick={() => handleDelete(p.id)}
-                  className="rounded-md bg-red-600/20 px-3 py-1 text-xs text-red-400 hover:bg-red-600/30"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Section: API Credentials
-// ---------------------------------------------------------------------------
-
-function CredentialsSection() {
-  const { data: credentials, isLoading } = useSWR<Record<string, CredentialStatus>>('/api/credentials', fetcher);
-  const [editingProvider, setEditingProvider] = useState<string | null>(null);
-  const [secretInput, setSecretInput] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async (provider: string) => {
-    if (!secretInput.trim()) return;
-    setSaving(true);
-    try {
-      await fetch(`/api/credentials/${provider}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: secretInput, authMode: 'api_key' }),
-      });
-      await mutate('/api/credentials');
-      setEditingProvider(null);
-      setSecretInput('');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRemove = async (provider: string) => {
-    await fetch(`/api/credentials/${provider}`, { method: 'DELETE' });
-    await mutate('/api/credentials');
-  };
-
-  return (
-    <section className="mb-8">
-      <h3 className="mb-3 text-lg font-semibold">API Credentials</h3>
-      {isLoading ? (
-        <p className="text-gray-500">Loading...</p>
-      ) : (
-        <div className="space-y-3">
-          {KNOWN_CREDENTIAL_PROVIDERS.map((provider) => {
-            const cred = credentials?.[provider];
-            const isEditing = editingProvider === provider;
+          {providers.map((provider) => {
+            const tc = PROVIDER_TYPES[provider.type] ?? PROVIDER_TYPES.custom;
+            const cred = credentials?.[provider.type];
+            const isConfiguring = configuringId === provider.id;
 
             return (
-              <div key={provider} className="rounded-lg border border-gray-800 bg-gray-900 p-4">
+              <div key={provider.id} className="rounded-lg border border-gray-800 bg-gray-900 p-4">
+                {/* Provider header row */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="font-medium capitalize text-gray-200">{provider}</span>
-                    {cred?.exists ? (
-                      <span className="text-xs text-green-400">{cred.masked}</span>
-                    ) : (
-                      <span className="text-xs text-gray-500">Not configured</span>
+                    <span className={`rounded px-2 py-0.5 text-xs ${tc.color}`}>
+                      {tc.label}
+                    </span>
+                    <span className="font-medium text-gray-200">{provider.name}</span>
+                    {provider.defaultModel && (
+                      <span className="text-xs text-gray-500">{provider.defaultModel}</span>
+                    )}
+                    {/* Credential status */}
+                    {tc.authModes.length > 0 && (
+                      cred?.exists ? (
+                        <span className="text-xs text-green-400">{cred.masked}</span>
+                      ) : (
+                        <span className="text-xs text-yellow-400">No credentials</span>
+                      )
+                    )}
+                    {provider.type === 'ollama' && provider.baseUrl && (
+                      <span className="text-xs text-gray-500">{provider.baseUrl}</span>
                     )}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        if (isEditing) {
-                          setEditingProvider(null);
-                          setSecretInput('');
-                        } else {
-                          setEditingProvider(provider);
-                          setSecretInput('');
-                        }
-                      }}
+                      onClick={() => isConfiguring ? setConfiguringId(null) : openConfigure(provider)}
                       className="rounded-md bg-gray-700 px-3 py-1 text-xs text-gray-300 hover:bg-gray-600"
                     >
-                      {isEditing ? 'Cancel' : 'Set Key'}
+                      {isConfiguring ? 'Close' : 'Configure'}
                     </button>
-                    {cred?.exists && (
-                      <button
-                        onClick={() => handleRemove(provider)}
-                        className="rounded-md bg-red-600/20 px-3 py-1 text-xs text-red-400 hover:bg-red-600/30"
-                      >
-                        Remove
-                      </button>
-                    )}
+                    <button
+                      onClick={() => toggleEnabled(provider.id, provider.enabled)}
+                      className={`rounded-md px-3 py-1 text-xs ${
+                        provider.enabled
+                          ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
+                          : 'bg-gray-600/20 text-gray-400 hover:bg-gray-600/30'
+                      }`}
+                    >
+                      {provider.enabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(provider.id)}
+                      className="rounded-md bg-red-600/20 px-3 py-1 text-xs text-red-400 hover:bg-red-600/30"
+                    >
+                      Remove
+                    </button>
                   </div>
                 </div>
-                {isEditing && (
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      type="password"
-                      value={secretInput}
-                      onChange={(e) => setSecretInput(e.target.value)}
-                      placeholder="Enter API key..."
-                      className="flex-1 rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
-                    />
-                    <button
-                      onClick={() => handleSave(provider)}
-                      disabled={saving || !secretInput.trim()}
-                      className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
-                    >
-                      {saving ? 'Saving...' : 'Save'}
-                    </button>
+
+                {/* Configure panel */}
+                {isConfiguring && (
+                  <div className="mt-4 space-y-3 border-t border-gray-700 pt-4">
+                    {/* Base URL (Ollama / Custom) */}
+                    {(tc.needsBaseUrl || provider.baseUrl) && (
+                      <div>
+                        <label className="mb-1 block text-xs text-gray-400">Base URL</label>
+                        <input
+                          type="text"
+                          value={editBaseUrl}
+                          onChange={(e) => setEditBaseUrl(e.target.value)}
+                          placeholder={tc.defaultBaseUrl ?? 'https://api.example.com'}
+                          className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+                        />
+                      </div>
+                    )}
+
+                    {/* Auth mode + secret for cloud providers */}
+                    {tc.authModes.length > 0 && (
+                      <div className="grid grid-cols-2 gap-3">
+                        {tc.authModes.length > 1 && (
+                          <div>
+                            <label className="mb-1 block text-xs text-gray-400">Auth Mode</label>
+                            <select
+                              value={editAuthMode}
+                              onChange={(e) => setEditAuthMode(e.target.value)}
+                              className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+                            >
+                              {tc.authModes.map((am) => (
+                                <option key={am.value} value={am.value}>{am.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        <div className={tc.authModes.length > 1 ? '' : 'col-span-2'}>
+                          <label className="mb-1 block text-xs text-gray-400">
+                            {cred?.exists ? 'Update Secret' : 'Secret'}
+                          </label>
+                          <input
+                            type="password"
+                            value={editSecret}
+                            onChange={(e) => setEditSecret(e.target.value)}
+                            placeholder={cred?.exists ? `Current: ${cred.masked}` : (tc.secretPlaceholder ?? 'Enter secret...')}
+                            className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Model selection */}
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-400">Default Model</label>
+                      {(tc.knownModels.length > 0 || discoveredModels.length > 0) ? (
+                        <select
+                          value={editModel}
+                          onChange={(e) => setEditModel(e.target.value)}
+                          className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+                        >
+                          <option value="">Select model...</option>
+                          {[...tc.knownModels, ...discoveredModels].map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={editModel}
+                          onChange={(e) => setEditModel(e.target.value)}
+                          placeholder="Enter model name..."
+                          className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 focus:outline-none"
+                        />
+                      )}
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => handleSaveConfigure(provider)}
+                        disabled={editSaving}
+                        className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+                      >
+                        {editSaving ? 'Saving...' : 'Save'}
+                      </button>
+
+                      <button
+                        onClick={() => handleTestConnection(provider)}
+                        disabled={testingId === provider.id}
+                        className="rounded-md bg-gray-700 px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-600 disabled:opacity-50"
+                      >
+                        {testingId === provider.id ? 'Testing...' : 'Test Connection'}
+                      </button>
+
+                      {provider.type === 'ollama' && (
+                        <button
+                          onClick={() => handleDiscoverModels(provider)}
+                          disabled={discoveringId === provider.id}
+                          className="rounded-md bg-gray-700 px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-600 disabled:opacity-50"
+                        >
+                          {discoveringId === provider.id ? 'Discovering...' : 'Discover Models'}
+                        </button>
+                      )}
+
+                      {cred?.exists && (
+                        <button
+                          onClick={() => handleRemoveCredential(provider.type)}
+                          className="rounded-md bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30"
+                        >
+                          Remove Credential
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Test result */}
+                    {testResult && configuringId === provider.id && (
+                      <div className={`rounded-md px-3 py-2 text-sm ${
+                        testResult.success
+                          ? 'bg-green-600/10 text-green-400'
+                          : 'bg-red-600/10 text-red-400'
+                      }`}>
+                        {testResult.success ? '  ' : '  '}{testResult.message}
+                      </div>
+                    )}
+
+                    {/* Discovered models (Ollama) */}
+                    {discoveredModels.length > 0 && configuringId === provider.id && (
+                      <div className="rounded-md bg-blue-600/10 px-3 py-2 text-sm text-blue-400">
+                        Found {discoveredModels.length} model(s): {discoveredModels.join(', ')}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -565,7 +865,6 @@ export default function SettingsPage() {
     <div>
       <h2 className="mb-6 text-2xl font-bold">Settings</h2>
       <ProvidersSection />
-      <CredentialsSection />
       <TeamModeSection config={config} onSave={reloadConfig} />
       <ApprovalSection config={config} onSave={reloadConfig} />
       <PRModeSection config={config} onSave={reloadConfig} />
