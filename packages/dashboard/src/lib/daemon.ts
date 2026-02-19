@@ -32,6 +32,8 @@ import {
   BUILTIN_TOOLS,
   HeartbeatService,
   MemoryUpdateHook,
+  AutoCommenter,
+  WorkLogRecorder,
 } from '@phalanx/core';
 import * as fs from 'node:fs/promises';
 import {
@@ -44,6 +46,8 @@ import {
   getHeartbeatLogRepository,
   getActivityLogRepository,
   getReverseProposalRepository,
+  getTicketCommentRepository,
+  getWorkLogRepository,
 } from './db';
 import { eventBus } from './event-bus';
 import { getLLMProvider } from './llm-provider';
@@ -207,6 +211,10 @@ function createDaemonWiring(): DaemonState {
     { defaultIntervalMs: 60_000 },
   );
 
+  // AutoCommenter for lifecycle comments on tickets
+  const autoCommenter = new AutoCommenter(getTicketCommentRepository());
+  const workLogRecorder = new WorkLogRecorder(getWorkLogRepository());
+
   // Wire everything together
   const deps: DaemonDeps = {
     heartbeatService,
@@ -219,6 +227,8 @@ function createDaemonWiring(): DaemonState {
     smartAssignment,
     proposalRepo,
     ticketRepo,
+    autoCommenter,
+    workLogRecorder,
     eventBus,
   };
 

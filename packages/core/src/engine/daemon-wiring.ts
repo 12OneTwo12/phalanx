@@ -26,6 +26,8 @@ import type { CompletionHandler } from './completion-handler.js';
 import type { SmartAssignmentService } from './smart-assignment-service.js';
 import type { ProposalRepository } from '../db/repositories/proposal.repository.js';
 import type { TicketRepository } from '../db/repositories/ticket.repository.js';
+import type { AutoCommenter } from './auto-commenter.js';
+import type { WorkLogRecorder } from './work-log-recorder.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,6 +44,10 @@ export interface DaemonDeps {
   smartAssignment?: SmartAssignmentService;
   proposalRepo: ProposalRepository;
   ticketRepo: TicketRepository;
+  /** Optional auto-commenter for lifecycle comments on tickets */
+  autoCommenter?: AutoCommenter;
+  /** Optional work log recorder for daily tracking */
+  workLogRecorder?: WorkLogRecorder;
   /** Optional SSE event emitter for dashboard integration */
   eventBus?: { emit(type: string, payload?: Record<string, unknown>): void };
 }
@@ -152,6 +158,49 @@ export class DaemonWiring {
       completionHandler.handleFailure(data.ticketId);
       eventBus?.emit('ticket:error', { ticketId: data.ticketId, error: data.error });
     });
+
+    // 8. AutoCommenter — write lifecycle comments on tickets
+    const { autoCommenter } = this.deps;
+    if (autoCommenter) {
+      this.on(orchestrator, 'ticket:started', (data: { ticketId: string; agentId?: string }) => {
+        autoCommenter.onTicketStarted(data.ticketId, data.agentId ?? 'unknown');
+      });
+      this.on(orchestrator, 'ticket:submitted', (data: { ticketId: string }) => {
+        autoCommenter.onTicketSubmitted(data.ticketId);
+      });
+      this.on(verificationService, 'verification:passed', (data: { ticketId: string }) => {
+        autoCommenter.onVerificationPassed(data.ticketId);
+      });
+      this.on(verificationService, 'verification:failed', (data: { ticketId: string; feedback?: string }) => {
+        autoCommenter.onVerificationFailed(data.ticketId, data.feedback);
+      });
+      this.on(verificationService, 'verification:escalated', (data: { ticketId: string }) => {
+        autoCommenter.onTicketEscalated(data.ticketId);
+      });
+      this.on(orchestrator, 'ticket:failed', (data: { ticketId: string; error?: string }) => {
+        autoCommenter.onTicketFailed(data.ticketId, data.error);
+      });
+      this.on(orchestrator, 'ticket:error', (data: { ticketId: string; error?: string }) => {
+        autoCommenter.onTicketFailed(data.ticketId, data.error);
+      });
+    }
+
+    // 9. WorkLogRecorder — record daily work logs from lifecycle events
+    const { workLogRecorder } = this.deps;
+    if (workLogRecorder) {
+      this.on(orchestrator, 'ticket:started', (data: { ticketId: string; agentId?: string }) => {
+        workLogRecorder.onTicketStarted(data.ticketId, data.agentId);
+      });
+      this.on(completionHandler, 'ticket:completed', (data: { ticketId: string; agentId?: string }) => {
+        workLogRecorder.onTicketCompleted(data.ticketId, data.agentId);
+      });
+      this.on(orchestrator, 'ticket:failed', (data: { ticketId: string; agentId?: string; error?: string }) => {
+        workLogRecorder.onTicketFailed(data.ticketId, data.agentId, data.error);
+      });
+      this.on(orchestrator, 'ticket:error', (data: { ticketId: string; agentId?: string; error?: string }) => {
+        workLogRecorder.onTicketFailed(data.ticketId, data.agentId, data.error);
+      });
+    }
 
     // 7. Forward key orchestrator events to SSE
     if (eventBus) {
