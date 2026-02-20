@@ -3,7 +3,7 @@
   "dashboardPort": 18080,
   "logPath": ".phalanx/phalanx.log",
   "llm": {
-    "systemDefault": "gemini/gemini-3.1-pro",
+    "systemDefault": "gemini/gemini-3.1-pro-preview",
     "providers": {
       "gemini": {
         "enabled": true,

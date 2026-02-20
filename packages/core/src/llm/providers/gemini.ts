@@ -20,6 +20,8 @@ interface GeminiPart {
   text?: string;
   functionCall?: { name: string; args: Record<string, unknown> };
   functionResponse?: { name: string; response: Record<string, unknown> };
+  /** Gemini 3.x thought signature — must be preserved across turns for tool calling */
+  thoughtSignature?: string;
 }
 
 interface GeminiContent {
@@ -103,6 +105,7 @@ export class GeminiProvider implements LLMProvider {
           } else if (c.type === 'tool_use') {
             parts.push({
               functionCall: { name: c.name, args: c.input },
+              ...(c.thoughtSignature && { thoughtSignature: c.thoughtSignature }),
             });
           } else if (c.type === 'tool_result') {
             parts.push({
@@ -194,6 +197,7 @@ export class GeminiProvider implements LLMProvider {
           id: crypto.randomUUID(),
           name: part.functionCall.name,
           input: part.functionCall.args,
+          ...(part.thoughtSignature && { thoughtSignature: part.thoughtSignature }),
         });
       }
     }

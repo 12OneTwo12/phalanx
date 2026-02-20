@@ -142,6 +142,7 @@ export class AgentExecutor {
             id: tc.id,
             name: tc.name,
             input: tc.input,
+            ...(tc.thoughtSignature && { thoughtSignature: tc.thoughtSignature }),
           } as ToolUseContent);
         }
         messages.push({ role: 'assistant', content: assistantContent });

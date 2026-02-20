@@ -178,8 +178,8 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
   // Google Gemini models
   // -------------------------------------------------------------------------
   {
-    fullId: 'gemini/gemini-3.1-pro',
-    id: 'gemini-3.1-pro',
+    fullId: 'gemini/gemini-3.1-pro-preview',
+    id: 'gemini-3.1-pro-preview',
     name: 'Gemini 3.1 Pro',
     provider: 'gemini',
     api: 'google-generative-ai',

@@ -86,6 +86,8 @@ export interface ToolUseContent {
   id: string;
   name: string;
   input: Record<string, unknown>;
+  /** Gemini 3.x thought signature — must be preserved across turns for tool calling */
+  thoughtSignature?: string;
 }
 
 export interface ToolResultContent {
@@ -166,6 +168,8 @@ export interface ToolCall {
   id: string;
   name: string;
   input: Record<string, unknown>;
+  /** Gemini 3.x thought signature — must be preserved across turns for tool calling */
+  thoughtSignature?: string;
 }
 
 export interface ToolCallResult {

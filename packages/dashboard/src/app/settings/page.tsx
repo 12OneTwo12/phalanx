@@ -88,7 +88,7 @@ const PROVIDER_TYPES: Record<string, ProviderTypeConfig> = {
     color: 'bg-cyan-500/20 text-cyan-400',
     authModes: [{ value: 'api_key', label: 'API Key' }],
     secretPlaceholder: 'AIza...',
-    knownModels: ['gemini-3.1-pro', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'],
+    knownModels: ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'],
   },
   custom: {
     label: 'Custom',
