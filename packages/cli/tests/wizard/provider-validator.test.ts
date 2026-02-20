@@ -4,7 +4,6 @@ import {
   validateOpenAIKey,
   validateGeminiKey,
   validateOllamaConnection,
-  validateSetupTokenFormat,
   PROVIDER_ENV_VARS,
   PROVIDER_VALIDATORS,
 } from '../../src/wizard/provider-validator.js';
@@ -145,27 +144,4 @@ describe('provider-validator', () => {
     });
   });
 
-  describe('validateSetupTokenFormat', () => {
-    it('returns valid for correct format', () => {
-      const token = 'sk-ant-oat01-' + 'a'.repeat(80);
-      expect(validateSetupTokenFormat(token)).toEqual({ valid: true });
-    });
-
-    it('rejects bad prefix', () => {
-      const result = validateSetupTokenFormat('sk-ant-bad-' + 'a'.repeat(80));
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('sk-ant-oat01-');
-    });
-
-    it('rejects short token', () => {
-      const result = validateSetupTokenFormat('sk-ant-oat01-short');
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('80');
-    });
-
-    it('accepts exactly 80 chars', () => {
-      const token = 'sk-ant-oat01-' + 'x'.repeat(67); // 13 + 67 = 80
-      expect(validateSetupTokenFormat(token)).toEqual({ valid: true });
-    });
-  });
 });

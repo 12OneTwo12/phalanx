@@ -13,11 +13,10 @@ import {
   validateAnthropicKey,
   validateOpenAIKey,
   validateGeminiKey,
-  validateSetupTokenFormat,
   PROVIDER_ENV_VARS,
 } from './provider-validator.js';
 import type { AuthCredential } from '../utils/credential-store.js';
-import { loadCredential, saveCredential, maskSecret } from '../utils/credential-store.js';
+import { saveCredential, maskSecret } from '../utils/credential-store.js';
 
 // ---------------------------------------------------------------------------
 // AuthStrategy interface
@@ -92,57 +91,6 @@ export class ApiKeyAuthStrategy implements AuthStrategy {
 
   async validate(credential: AuthCredential): Promise<ValidationResult> {
     return this.validator(credential.secret);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// SetupTokenAuthStrategy — Anthropic Claude Code Plan (Max/Pro)
-// ---------------------------------------------------------------------------
-
-export class SetupTokenAuthStrategy implements AuthStrategy {
-  readonly id = 'setup-token';
-  readonly label = 'Claude Code Plan (setup-token)';
-  readonly hint = 'For Max/Pro subscribers — run "claude setup-token"';
-  readonly authMode: ProviderAuthMode = 'token';
-
-  detect(): AuthDetectResult {
-    const stored = loadCredential('anthropic');
-    if (stored && stored.authMode === 'token') {
-      return {
-        found: true,
-        source: 'credential-store',
-        credential: stored,
-      };
-    }
-    return { found: false };
-  }
-
-  async prompt(): Promise<AuthCredential | null> {
-    p.log.info(
-      'Run "claude setup-token" in another terminal to generate a token.\n' +
-        'Then paste it below.',
-    );
-
-    const token = await p.text({
-      message: 'Paste your setup-token:',
-      placeholder: 'sk-ant-oat01-...',
-      validate: (val) => {
-        if (!val?.trim()) return 'Token cannot be empty';
-        const result = validateSetupTokenFormat(val.trim());
-        if (!result.valid) return result.error;
-        return undefined;
-      },
-    });
-
-    if (p.isCancel(token)) return null;
-
-    return { secret: token.trim(), authMode: 'token' };
-  }
-
-  async validate(credential: AuthCredential): Promise<ValidationResult> {
-    // Format-only validation — setup-tokens have user:inference scope only
-    // and cannot access /v1/models. This matches OpenClaw's approach.
-    return validateSetupTokenFormat(credential.secret);
   }
 }
 
@@ -251,7 +199,6 @@ export class CodexOAuthStrategy implements AuthStrategy {
 const PROVIDER_AUTH_REGISTRY: Record<string, () => AuthStrategy[]> = {
   anthropic: () => [
     new ApiKeyAuthStrategy('Anthropic (Claude)', 'ANTHROPIC_API_KEY', validateAnthropicKey),
-    new SetupTokenAuthStrategy(),
   ],
   openai: () => [
     new ApiKeyAuthStrategy('OpenAI (GPT)', 'OPENAI_API_KEY', validateOpenAIKey),

@@ -61,7 +61,6 @@ const PROVIDER_TYPES: Record<string, ProviderTypeConfig> = {
     color: 'bg-orange-500/20 text-orange-400',
     authModes: [
       { value: 'api_key', label: 'API Key' },
-      { value: 'token', label: 'Setup Token' },
     ],
     secretPlaceholder: 'sk-ant-...',
     knownModels: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001'],

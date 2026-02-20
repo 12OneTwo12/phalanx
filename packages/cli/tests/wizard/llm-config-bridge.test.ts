@@ -90,11 +90,11 @@ describe('llm-config-bridge', () => {
   it('sets auth mode from LLMProviderEntry.authMode', () => {
     const config = makeConfig({
       providers: {
-        anthropic: { enabled: true, authMode: 'token' },
+        openai: { enabled: true, authMode: 'oauth' },
       },
     });
     const result = toPhalanxLLMConfig(config);
-    expect(result.providers.anthropic.auth).toBe('token');
+    expect(result.providers.openai.auth).toBe('oauth');
   });
 
   it('defaults authMode to api-key when not set', () => {
@@ -108,14 +108,14 @@ describe('llm-config-bridge', () => {
   });
 
   it('injects stored credential as apiKey', () => {
-    saveCredential('anthropic', { secret: 'sk-stored-token', authMode: 'token' });
+    saveCredential('anthropic', { secret: 'sk-ant-stored-key', authMode: 'api-key' });
     const config = makeConfig({
       providers: {
-        anthropic: { enabled: true, authMode: 'token' },
+        anthropic: { enabled: true, authMode: 'api-key' },
       },
     });
     const result = toPhalanxLLMConfig(config);
-    expect(result.providers.anthropic.apiKey).toBe('sk-stored-token');
+    expect(result.providers.anthropic.apiKey).toBe('sk-ant-stored-key');
   });
 
   it('does not inject credential for auth mode none', () => {

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ApiKeyAuthStrategy,
-  SetupTokenAuthStrategy,
   CodexOAuthStrategy,
   getProviderAuthStrategies,
 } from '../../src/wizard/auth-strategy.js';
@@ -78,59 +77,6 @@ describe('auth-strategy', () => {
     });
   });
 
-  describe('SetupTokenAuthStrategy', () => {
-    it('detects stored credential from credential store', () => {
-      saveCredential('anthropic', { secret: 'sk-ant-oat01-test', authMode: 'token' });
-      const strategy = new SetupTokenAuthStrategy();
-      const result = strategy.detect();
-      expect(result.found).toBe(true);
-      expect(result.source).toBe('credential-store');
-    });
-
-    it('returns not found when no stored token', () => {
-      const strategy = new SetupTokenAuthStrategy();
-      const result = strategy.detect();
-      expect(result.found).toBe(false);
-    });
-
-    it('does not detect api-key credentials as setup-token', () => {
-      saveCredential('anthropic', { secret: 'sk-ant-api-key', authMode: 'api-key' });
-      const strategy = new SetupTokenAuthStrategy();
-      const result = strategy.detect();
-      expect(result.found).toBe(false);
-    });
-
-    it('validates format — rejects bad prefix', async () => {
-      const strategy = new SetupTokenAuthStrategy();
-      const result = await strategy.validate({ secret: 'bad-prefix-token', authMode: 'token' });
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('sk-ant-oat01-');
-    });
-
-    it('validates format — rejects short token', async () => {
-      const strategy = new SetupTokenAuthStrategy();
-      const result = await strategy.validate({ secret: 'sk-ant-oat01-short', authMode: 'token' });
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('short');
-    });
-
-    it('validates format-only (no network) for good token', async () => {
-      const strategy = new SetupTokenAuthStrategy();
-      const token = 'sk-ant-oat01-' + 'a'.repeat(80);
-      const result = await strategy.validate({ secret: token, authMode: 'token' });
-      expect(result.valid).toBe(true);
-      // Setup-tokens have user:inference scope only — no network validation
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
-
-    it('has correct metadata', () => {
-      const strategy = new SetupTokenAuthStrategy();
-      expect(strategy.id).toBe('setup-token');
-      expect(strategy.authMode).toBe('token');
-      expect(strategy.label).toContain('Claude Code Plan');
-    });
-  });
-
   describe('CodexOAuthStrategy', () => {
     it('returns not found when ~/.codex/auth.json does not exist', () => {
       const strategy = new CodexOAuthStrategy(join(tempDir, 'nonexistent', 'auth.json'));
@@ -189,11 +135,10 @@ describe('auth-strategy', () => {
   });
 
   describe('getProviderAuthStrategies', () => {
-    it('returns 2 strategies for anthropic', () => {
+    it('returns 1 strategy for anthropic (api-key only)', () => {
       const strategies = getProviderAuthStrategies('anthropic');
-      expect(strategies).toHaveLength(2);
+      expect(strategies).toHaveLength(1);
       expect(strategies[0].id).toBe('api-key');
-      expect(strategies[1].id).toBe('setup-token');
     });
 
     it('returns 2 strategies for openai', () => {
