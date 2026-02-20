@@ -1,19 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import mongoose from 'mongoose';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { User } from './user.model.js';
-import { IUser } from '../types/user.js';
 
 describe('User Model', () => {
   beforeAll(async () => {
-    await mongoose.connect('mongodb://localhost:27017/test_user_model');
-  });
-
-  afterAll(async () => {
-    await mongoose.connection.close();
-  });
-
-  beforeEach(async () => {
-    await User.deleteMany({});
+    // Ensure indexes are built before testing unique constraints
+    await User.syncIndexes();
   });
 
   describe('Validation', () => {

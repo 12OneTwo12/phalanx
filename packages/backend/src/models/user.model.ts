@@ -10,10 +10,8 @@ const userSchema = new Schema<IUser>(
     email: {
       type: String,
       required: true,
-      unique: true,
       lowercase: true,
       trim: true,
-      index: true,
       validate: {
         validator: (value: string) => {
           // Basic email validation regex
@@ -78,8 +76,8 @@ const userSchema = new Schema<IUser>(
 userSchema.index({ oauth_provider: 1, oauth_id: 1 }, { 
   unique: true,
   partialFilterExpression: { 
-    oauth_provider: { $ne: null }, 
-    oauth_id: { $ne: null } 
+    oauth_provider: { $type: "string" }, 
+    oauth_id: { $type: "string" } 
   }
 });
 

@@ -13,7 +13,6 @@ const blacklistedTokenSchema = new Schema<IBlacklistedToken>({
     type: String,
     required: true,
     unique: true,
-    index: true,
   },
   userId: {
     type: String,
@@ -23,7 +22,6 @@ const blacklistedTokenSchema = new Schema<IBlacklistedToken>({
   expiresAt: {
     type: Date,
     required: true,
-    index: true,
   },
   blacklistedAt: {
     type: Date,
