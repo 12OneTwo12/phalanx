@@ -319,7 +319,7 @@ function createDaemonWiring(): DaemonState {
         denylist: [],
       },
       workingDirectory: projectRoot,
-      maxIterations: 20,
+      maxIterations: 50,
       baseBranch: 'main',
       teamMode: teamModeConfig.mode,
     },

@@ -6,6 +6,13 @@
 import type { DatabaseManager } from '../database.js';
 
 export function up(db: DatabaseManager): void {
+  // Check if migration already applied (paused already in CHECK constraint).
+  // Without this guard, re-running DROP TABLE epics CASCADE-deletes all tickets.
+  const row = db.raw.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='epics'",
+  ).get() as { sql: string } | undefined;
+  if (row?.sql?.includes("'paused'")) return;
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS epics_new (
       id TEXT PRIMARY KEY,
