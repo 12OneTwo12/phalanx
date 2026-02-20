@@ -3,19 +3,27 @@
   "dashboardPort": 18080,
   "logPath": ".phalanx/phalanx.log",
   "llm": {
-    "systemDefault": "anthropic/claude-sonnet-4-5-20250929",
+    "systemDefault": "gemini/gemini-3.1-pro",
     "providers": {
-      "anthropic": {
+      "gemini": {
         "enabled": true,
-        "authMode": "token"
+        "authMode": "api-key"
       }
     }
   },
   "daemon": {
-    "autoStart": true
+    "autoStart": true,
+    "teamMode": {
+      "mode": "smart"
+    },
+    "approval": {
+      "mode": "auto"
+    }
   },
   "channels": {
-    "web": { "enabled": true },
+    "web": {
+      "enabled": true
+    },
     "telegram": {
       "enabled": false,
       "accounts": {
