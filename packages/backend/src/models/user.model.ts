@@ -1,5 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 import { IUser } from '../types/user.js';
+import { hashPassword, comparePassword } from '../utils/password.js';
 
 /**
  * User schema definition
@@ -59,6 +60,10 @@ const userSchema = new Schema<IUser>(
       required: true,
       default: false,
     },
+    last_login: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: {
@@ -92,12 +97,26 @@ userSchema.virtual('id').get(function() {
 // Ensure virtual fields are included in JSON
 userSchema.set('toJSON', {
   virtuals: true,
-  transform: function(doc, ret) {
-    delete ret.__v;
-    delete ret.password_hash; // Never expose password hash
+  transform: function(_doc, ret) {
+    const obj = ret as unknown as Record<string, unknown>;
+    delete obj.__v;
+    delete obj.password_hash; // Never expose password hash
     return ret;
   }
 });
+
+// Instance method to set password (hashes it automatically)
+userSchema.methods.setPassword = async function(password: string): Promise<void> {
+  this.password_hash = await hashPassword(password);
+};
+
+// Instance method to verify password
+userSchema.methods.verifyPassword = async function(password: string): Promise<boolean> {
+  if (!this.password_hash) {
+    return false;
+  }
+  return comparePassword(password, this.password_hash);
+};
 
 // Pre-save middleware to validate OAuth fields
 userSchema.pre('save', function(next) {

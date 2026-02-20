@@ -11,8 +11,13 @@ export interface IUser extends Document {
   oauth_provider?: string;
   oauth_id?: string;
   email_verified: boolean;
+  last_login?: Date;
   created_at: Date;
   updated_at: Date;
+  
+  // Instance methods
+  setPassword(password: string): Promise<void>;
+  verifyPassword(password: string): Promise<boolean>;
 }
 
 /**

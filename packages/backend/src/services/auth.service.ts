@@ -2,8 +2,9 @@ import jwt, { JwtPayload } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { env } from '../config/env.js';
 import { jwtKeys } from '../config/jwt-keys.js';
-import { RefreshToken, IRefreshToken } from '../models/refresh-token.model.js';
+import { RefreshToken } from '../models/refresh-token.model.js';
 import { BlacklistedToken } from '../models/blacklisted-token.model.js';
+// @ts-expect-error ms package lacks type declarations
 import ms from 'ms';
 
 export interface TokenPayload {
@@ -22,7 +23,7 @@ export class AuthService {
   generateAccessToken(payload: TokenPayload): string {
     return jwt.sign(payload, jwtKeys.privateKey, {
       algorithm: 'RS256',
-      expiresIn: env.JWT_ACCESS_TOKEN_EXPIRES_IN,
+      expiresIn: env.JWT_ACCESS_TOKEN_EXPIRES_IN as jwt.SignOptions['expiresIn'],
       issuer: env.JWT_ISSUER,
     });
   }
@@ -80,7 +81,7 @@ export class AuthService {
       return true;
     } catch (error) {
       // If token already exists in blacklist, consider it successful
-      if (error.code === 11000) { // MongoDB duplicate key error
+      if ((error as Record<string, unknown>).code === 11000) { // MongoDB duplicate key error
         return true;
       }
       throw error;
@@ -105,7 +106,7 @@ export class AuthService {
     };
 
     const token = jwt.sign(refreshTokenPayload, env.JWT_SECRET, {
-      expiresIn: env.JWT_REFRESH_TOKEN_EXPIRES_IN,
+      expiresIn: env.JWT_REFRESH_TOKEN_EXPIRES_IN as jwt.SignOptions['expiresIn'],
     });
 
     // Store the refresh token in the database

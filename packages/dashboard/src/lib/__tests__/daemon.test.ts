@@ -65,6 +65,7 @@ vi.mock('@phalanx/core', async () => {
   class MockAgentTicketExecutor {
     execute = vi.fn().mockResolvedValue({ success: true });
     addPostExecutionHook = vi.fn();
+    setExecutionTraceRepo = vi.fn();
   }
 
   class MockDefaultAgentConfigResolver {
@@ -115,7 +116,20 @@ vi.mock('@phalanx/core', async () => {
     ToolRegistry: MockToolRegistry,
     HeartbeatService: MockHeartbeatService,
     MemoryUpdateHook: vi.fn(),
+    AutoCommenter: vi.fn(() => ({ onStatusChange: vi.fn() })),
+    WorkLogRecorder: vi.fn(() => ({ record: vi.fn() })),
     BUILTIN_TOOLS: [],
+    createTicketCommentTool: vi.fn(() => ({ name: 'mock-comment-tool' })),
+    createTicketReadCommentsTool: vi.fn(() => ({ name: 'mock-read-comments-tool' })),
+    createMemoryReadTool: vi.fn(() => ({ name: 'mock-memory-read-tool' })),
+    createMemoryWriteTool: vi.fn(() => ({ name: 'mock-memory-write-tool' })),
+    createRequestDiscussionTool: vi.fn(() => ({ name: 'mock-request-discussion-tool' })),
+    createReadDiscussionsTool: vi.fn(() => ({ name: 'mock-read-discussions-tool' })),
+    MeetingOrchestrator: vi.fn(() => ({ orchestrate: vi.fn() })),
+    DebateOrchestrator: vi.fn(() => ({ orchestrate: vi.fn() })),
+    DiscussionService: vi.fn(() => ({ start: vi.fn() })),
+    ApprovalService: vi.fn(() => ({ approve: vi.fn() })),
+    PRController: vi.fn(() => ({ handle: vi.fn() })),
     injectConventions: vi.fn((config: Record<string, unknown>) => config),
     createLLMStack: vi.fn(() => ({
       registry: { register: vi.fn(), has: vi.fn().mockReturnValue(true), getAll: vi.fn().mockReturnValue([]) },
@@ -136,6 +150,14 @@ vi.mock('../db', () => ({
   getHeartbeatLogRepository: vi.fn(() => ({})),
   getActivityLogRepository: vi.fn(() => ({})),
   getReverseProposalRepository: vi.fn(() => ({})),
+  getTicketCommentRepository: vi.fn(() => ({})),
+  getWorkLogRepository: vi.fn(() => ({})),
+  getMeetingRepository: vi.fn(() => ({})),
+  getMeetingParticipantRepository: vi.fn(() => ({})),
+  getDebateRepository: vi.fn(() => ({})),
+  getDebateArgumentRepository: vi.fn(() => ({})),
+  getExecutionTraceRepository: vi.fn(() => ({})),
+  getProviderConfigRepository: vi.fn(() => ({})),
 }));
 
 vi.mock('../event-bus', () => ({
