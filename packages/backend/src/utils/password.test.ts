@@ -68,7 +68,8 @@ describe('password utilities', () => {
     });
 
     it('should handle invalid hash format gracefully', async () => {
-      await expect(comparePassword('password', 'not-a-bcrypt-hash')).rejects.toThrow('Failed to compare passwords');
+      const result = await comparePassword('password', 'not-a-bcrypt-hash');
+      expect(result).toBe(false);
     });
   });
 

@@ -69,11 +69,13 @@ export function loadJWTKeys(): JWTKeys {
   fs.writeFileSync(privateKeyPath, keys.privateKey);
   fs.writeFileSync(publicKeyPath, keys.publicKey);
 
-  // Add to .gitignore
+  // Add to .gitignore if it exists
   const gitignorePath = path.join(process.cwd(), '.gitignore');
-  const gitignoreContent = fs.readFileSync(gitignorePath, 'utf-8');
-  if (!gitignoreContent.includes('/keys/')) {
-    fs.appendFileSync(gitignorePath, '\n# JWT Keys\n/keys/\n');
+  if (fs.existsSync(gitignorePath)) {
+    const gitignoreContent = fs.readFileSync(gitignorePath, 'utf-8');
+    if (!gitignoreContent.includes('/keys/')) {
+      fs.appendFileSync(gitignorePath, '\n# JWT Keys\n/keys/\n');
+    }
   }
 
   return keys;

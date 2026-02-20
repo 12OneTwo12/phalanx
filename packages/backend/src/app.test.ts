@@ -27,8 +27,10 @@ describe('App', () => {
   });
 
   it('should apply CORS headers', async () => {
-    const response = await request(app).get('/health');
-    
+    const response = await request(app)
+      .get('/health')
+      .set('Origin', 'http://localhost:3000');
+
     expect(response.headers).toHaveProperty('access-control-allow-origin');
   });
 
