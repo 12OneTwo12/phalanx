@@ -64,7 +64,7 @@ const PROVIDER_TYPES: Record<string, ProviderTypeConfig> = {
       { value: 'token', label: 'Setup Token' },
     ],
     secretPlaceholder: 'sk-ant-...',
-    knownModels: ['claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001', 'claude-opus-4-6'],
+    knownModels: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001'],
   },
   openai: {
     label: 'OpenAI',
@@ -74,7 +74,7 @@ const PROVIDER_TYPES: Record<string, ProviderTypeConfig> = {
       { value: 'oauth', label: 'OAuth Token' },
     ],
     secretPlaceholder: 'sk-...',
-    knownModels: ['gpt-4o', 'gpt-4o-mini', 'o1-preview'],
+    knownModels: ['gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini', 'codex-mini'],
   },
   ollama: {
     label: 'Ollama',
@@ -89,7 +89,7 @@ const PROVIDER_TYPES: Record<string, ProviderTypeConfig> = {
     color: 'bg-cyan-500/20 text-cyan-400',
     authModes: [{ value: 'api_key', label: 'API Key' }],
     secretPlaceholder: 'AIza...',
-    knownModels: ['gemini-2.0-flash', 'gemini-1.5-pro'],
+    knownModels: ['gemini-3.1-pro', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'],
   },
   custom: {
     label: 'Custom',

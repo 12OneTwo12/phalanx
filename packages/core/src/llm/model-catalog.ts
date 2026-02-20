@@ -12,6 +12,32 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
   // Anthropic models
   // -------------------------------------------------------------------------
   {
+    fullId: 'anthropic/claude-opus-4-6',
+    id: 'claude-opus-4-6',
+    name: 'Claude Opus 4.6',
+    provider: 'anthropic',
+    api: 'anthropic-messages',
+    reasoning: false,
+    input: ['text', 'image'],
+    cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+    contextWindow: 200_000,
+    maxTokens: 128_000,
+    compat: { supportsThinking: true, supportsTools: true, supportsImages: true, supportsStreaming: true },
+  },
+  {
+    fullId: 'anthropic/claude-sonnet-4-6',
+    id: 'claude-sonnet-4-6',
+    name: 'Claude Sonnet 4.6',
+    provider: 'anthropic',
+    api: 'anthropic-messages',
+    reasoning: false,
+    input: ['text', 'image'],
+    cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+    contextWindow: 200_000,
+    maxTokens: 64_000,
+    compat: { supportsThinking: true, supportsTools: true, supportsImages: true, supportsStreaming: true },
+  },
+  {
     fullId: 'anthropic/claude-opus-4-20250514',
     id: 'claude-opus-4-20250514',
     name: 'Claude Opus 4',
@@ -134,10 +160,36 @@ export const MODEL_CATALOG: ModelCatalogEntry[] = [
       maxTokensField: 'max_completion_tokens',
     },
   },
+  {
+    fullId: 'openai/codex-mini',
+    id: 'codex-mini',
+    name: 'Codex Mini',
+    provider: 'openai',
+    api: 'openai-responses',
+    reasoning: true,
+    input: ['text'],
+    cost: { input: 1.5, output: 6, cacheRead: 0.375, cacheWrite: 0 },
+    contextWindow: 200_000,
+    maxTokens: 100_000,
+    compat: { supportsTools: true, supportsStreaming: true },
+  },
 
   // -------------------------------------------------------------------------
   // Google Gemini models
   // -------------------------------------------------------------------------
+  {
+    fullId: 'gemini/gemini-3.1-pro',
+    id: 'gemini-3.1-pro',
+    name: 'Gemini 3.1 Pro',
+    provider: 'gemini',
+    api: 'google-generative-ai',
+    reasoning: false,
+    input: ['text', 'image'],
+    cost: { input: 2, output: 12, cacheRead: 0.2, cacheWrite: 0 },
+    contextWindow: 1_000_000,
+    maxTokens: 64_000,
+    compat: { supportsTools: true, supportsImages: true, supportsStreaming: true },
+  },
   {
     fullId: 'gemini/gemini-2.5-pro',
     id: 'gemini-2.5-pro',
