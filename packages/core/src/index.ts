@@ -9,3 +9,4 @@ export * from './engine/index.js';
 export * from './heartbeat/index.js';
 export * from './channel/index.js';
 export * from './skills/index.js';
+export { subtract } from './utils/subtract.js';
